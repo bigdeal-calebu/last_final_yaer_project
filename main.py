@@ -1,7 +1,5 @@
 import customtkinter as ctk
-from register import show_registration_page
-from login import create_login_ui
-# from db import get_connection
+import modify_live
 
 def main():
     ctk.set_appearance_mode("Dark")
@@ -18,39 +16,63 @@ def main():
             widget.destroy()
 
     def load_login():
-        clear_screen()
-        create_login_ui(
-            main_container, 
-            on_back_click=load_registration, 
-            on_user_login_success=on_user_success, # Named correctly here
-            on_admin_login_success=on_admin_success, # Named correctly here
-            on_register_click=load_registration
-        )
+        def _rebuild():
+            clear_screen()
+            from login import create_login_ui
+            create_login_ui(
+                main_container, 
+                on_back_click=load_registration, 
+                on_user_login_success=on_user_success,
+                on_admin_login_success=on_admin_success,
+                on_register_click=load_registration,
+                on_forgot_password_click=load_forgot_password
+            )
+        modify_live.set_refresh_action(_rebuild)
+        _rebuild()
+
+    def load_forgot_password():
+        def _rebuild():
+            clear_screen()
+            from forgot_password import ForgotPasswordFlow
+            ForgotPasswordFlow(
+                main_container,
+                on_back_to_login=load_login
+            )
+        modify_live.set_refresh_action(_rebuild)
+        _rebuild()
 
     def load_registration():
-        clear_screen()
-        # Call with main_container as root so it clears properly later
-        show_registration_page(
-            main_container, 
-            on_user_login=load_login, 
-            on_admin_login=load_login  
-        )
+        def _rebuild():
+            clear_screen()
+            from register import show_registration_page
+            show_registration_page(
+                main_container, 
+                on_user_login=load_login, 
+                on_admin_login=load_login  
+            )
+        modify_live.set_refresh_action(_rebuild)
+        _rebuild()
 
     # Success Callbacks
     def on_user_success(data): 
         print("Student Logged In:", data)
-        clear_screen()
-        import student_dashboard
-        student_dashboard.create_student_dashboard(main_container, on_logout_click=load_login, student_data=data)
+        def _rebuild():
+            clear_screen()
+            import student_dashboard
+            student_dashboard.create_student_dashboard(main_container, on_logout_click=load_login, student_data=data)
+        modify_live.set_refresh_action(_rebuild)
+        _rebuild()
 
     def on_admin_success(data): 
         print("Admin Logged In:", data)
-        clear_screen()
-        import admin_dashboard
-        admin_dashboard.create_admin_dashboard(main_container, on_logout_click=load_login, admin_data=data)
+        def _rebuild():
+            clear_screen()
+            import admin_dashboard
+            admin_dashboard.create_admin_dashboard(main_container, on_logout_click=load_login, admin_data=data)
+        modify_live.set_refresh_action(_rebuild)
+        _rebuild()
 
     # Launch the app starting with registration
-    # Changed 'root' to 'main_container' and matched function names
     load_registration() 
     
     root.mainloop()

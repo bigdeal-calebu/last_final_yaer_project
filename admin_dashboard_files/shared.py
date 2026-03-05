@@ -48,12 +48,15 @@ def load_label_map():
         label_map = {}
 load_label_map()
 
-# Camera & detection globals
+# Load Dynamic UI Settings
+import admin_dashboard_files.config_manager as config_manager
+
+# Camera & detection globals (Live-loaded from Config Manager)
 frame_count = 0
-process_every_n_frames = 1
+process_every_n_frames = config_manager.get("process_every_n_frames")
 last_faces = []
-detection_scale = 0.75
-current_camera_index = 0
+detection_scale = config_manager.get("detection_scale")
+current_camera_index = config_manager.get("camera_index")
 
 present_student_ids = set()
 present_details_list = []
@@ -72,7 +75,12 @@ def start_camera_stream(index=None):
         return True
     
     # Use default backend to avoid DSHOW Index warning on Windows
+    # 🔥 Faster Windows backend
+    # Trying MSMF or default first, then falling back to DSHOW
+    os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
     camera_cap = cv2.VideoCapture(index)
+    if not camera_cap.isOpened():
+        camera_cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
     if not camera_cap.isOpened():
         alt = 1 if index == 0 else 0
         camera_cap = cv2.VideoCapture(alt)
@@ -112,9 +120,16 @@ def get_camera_frame():
     global camera_cap, frame_count, last_faces, model_loaded
     global unknown_capture_active, unknown_frames_to_capture, current_unknown_folder, last_unknown_trigger_time
     global present_student_ids, present_details_list
+    
+    # Reload configs loosely per frame (config_manager caches this in memory so it's very fast, 
+    # but allows live UI tweaks without restart)
+    process_every_n_frames = config_manager.get("process_every_n_frames")
+    detection_scale = config_manager.get("detection_scale")
+    confidence_threshold = config_manager.get("confidence_threshold")
+    capture_unknowns = config_manager.get("capture_unknowns")
 
     if camera_cap is None or not camera_cap.isOpened():
-        if not start_camera_stream():
+        if not start_camera_stream(config_manager.get("camera_index")):
             return None
 
     success, frame = camera_cap.read()
@@ -167,7 +182,7 @@ def get_camera_frame():
                 roi_r = clahe.apply(roi_r)
 
                 lbl, conf = recognizer.predict(roi_r)
-                if conf < 60:  # stricter threshold
+                if conf < confidence_threshold:  # using dynamic threshold
                     student_id_str = label_map.get(str(lbl), "")
                     if student_id_str:
                         name = student_id_str
@@ -206,7 +221,7 @@ def get_camera_frame():
                     conf_text = ""
 
                 # Unknown capture
-                if name == "Unknown":
+                if name == "Unknown" and capture_unknowns:
                     now_ts = time.time()
                     if not unknown_capture_active and (now_ts - last_unknown_trigger_time) > 10:
                         base_dir = "unknowns"
@@ -217,14 +232,16 @@ def get_camera_frame():
                         new_folder = os.path.join(base_dir, f"unknown{i}")
                         os.makedirs(new_folder)
                         current_unknown_folder = new_folder
-                        unknown_frames_to_capture = 15
+                        unknown_frames_to_capture = config_manager.get("unknown_frames_to_capture")
                         unknown_capture_active = True
                         last_unknown_trigger_time = now_ts
 
                     if unknown_capture_active and unknown_frames_to_capture > 0:
                         face_img = frame[y:y+h, x:x+w]
                         if face_img.size > 0:
-                            img_name = f"frame_{16-unknown_frames_to_capture}.jpg"
+                            # Use total frames config so we know when it reaches 0
+                            total_u = config_manager.get("unknown_frames_to_capture")
+                            img_name = f"frame_{(total_u + 1)-unknown_frames_to_capture}.jpg"
                             cv2.imwrite(os.path.join(current_unknown_folder, img_name), face_img)
                             unknown_frames_to_capture -= 1
                             if unknown_frames_to_capture == 0:

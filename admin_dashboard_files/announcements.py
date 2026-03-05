@@ -1,8 +1,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
 
-
-
 def show_announcement_content(content_area, responsive_manager, admin_data=None):
     """Manage System Announcements"""
     # Main Header Area
@@ -19,9 +17,7 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
     card_container.pack(fill="x", expand=True, padx=40)
 
     announce_frame = ctk.CTkFrame(card_container, fg_color="#1f1f1f", corner_radius=16, border_width=1, border_color="#333")
-    # Setting an arbitrary max width isn't directly supported by pack width, but we can prevent expansion past a point 
-    # Or just use a fixed width inner frame:
-    announce_frame.pack(anchor="w", fill="x", expand=False, pady=10) # Using fill="x" to stretch to parent's padding but stay contained
+    announce_frame.pack(anchor="w", fill="x", expand=False, pady=10) 
     
     # Form Content Wrapper (For clean inner padding)
     inner_padding = ctk.CTkFrame(announce_frame, fg_color="transparent")
@@ -69,7 +65,6 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
     import threading
 
     def send_emails_in_background(title, msg_body, audience, specific_reg_no=None):
-        # This runs in a separate thread so it doesn't freeze the Admin UI while sending
         def _send():
             if audience == "Specific Student":
                 if not specific_reg_no: return
@@ -87,9 +82,6 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
                 print("No students found to send emails to.")
                 return
                 
-            # ==========================================
-            # EMAIL SMTP CONFIGURATION
-            # ==========================================
             if not admin_data or not admin_data.get('email') or not admin_data.get('password'):
                 print("⚠️ Admin email or password is missing in the database. Cannot send emails.")
                 return
@@ -98,7 +90,6 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
             SENDER_PASSWORD = admin_data.get('password')
             
             try:
-                # Connect to SMTP Server (Gmail example)
                 server = smtplib.SMTP('smtp.gmail.com', 587)
                 server.starttls()
                 server.login(SENDER_EMAIL, SENDER_PASSWORD)
@@ -137,12 +128,9 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
             db_audience = f"Specific Student: {specific_reg_no}"
         
         if title:
-            # 1. Save to Database
             success, msg = db_post(title, msg_body, db_audience)
             if success:
-                # 2. Trigger Email Sending (Background task)
                 send_emails_in_background(title, msg_body, audience, specific_reg_no)
-                
                 messagebox.showinfo("Success", "Announcement posted successfully and email dispatch started!")
                 title_entry.delete(0, 'end')
                 msg_entry.delete("1.0", 'end')
@@ -152,71 +140,9 @@ def show_announcement_content(content_area, responsive_manager, admin_data=None)
         else:
             messagebox.showerror("Error", "Title is required!")
 
-    # Submit button right-aligned
     bottom_frame = ctk.CTkFrame(inner_padding, fg_color="transparent")
     bottom_frame.pack(fill="x")
     
     submit_btn = ctk.CTkButton(bottom_frame, text="📢 POST ANNOUNCEMENT", height=45, width=220, 
                  font=("Segoe UI", 14, "bold"), fg_color="#F39C12", hover_color="#D68910", text_color="black", command=post_announcement)
     submit_btn.pack(side="right")
-
-
-
-
-def show_add_admin_content(content_area, responsive_manager):
-    """Add new admin users - FULLY IMPLEMENTED"""
-    header_frame = ctk.CTkFrame(content_area, fg_color="transparent")
-    header_frame.pack(fill="x", padx=30, pady=(20, 10))
-    
-    ctk.CTkLabel(header_frame, text="👤 Add New Admin", font=("Segoe UI", 32, "bold"), text_color="#3498DB").pack(anchor="w")
-
-    admin_frame = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=15)
-    admin_frame.pack(fill="both", expand=True, padx=30, pady=20)
-    
-    ctk.CTkLabel(admin_frame, text="Admin Credentials", font=("Arial", 16, "bold"), text_color="white").pack(anchor="w", padx=30, pady=(30, 15))
-    
-    ctk.CTkLabel(admin_frame, text="Full Name:", font=("Arial", 12)).pack(anchor="w", padx=30, pady=(5,0))
-    name_entry = ctk.CTkEntry(admin_frame, width=400)
-    name_entry.pack(anchor="w", padx=30, pady=(0, 20))
-    
-    ctk.CTkLabel(admin_frame, text="Username:", font=("Arial", 12)).pack(anchor="w", padx=30, pady=(5,0))
-    user_entry = ctk.CTkEntry(admin_frame, width=400)
-    user_entry.pack(anchor="w", padx=30, pady=(0, 20))
-    
-    ctk.CTkLabel(admin_frame, text="Password:", font=("Arial", 12)).pack(anchor="w", padx=30, pady=(5,0))
-    pass_entry = ctk.CTkEntry(admin_frame, width=400, show="●")
-    pass_entry.pack(anchor="w", padx=30, pady=(0, 30))
-    
-    def handle_add_admin():
-        messagebox.showinfo("Success", "New admin added successfully!")
-    
-    ctk.CTkButton(admin_frame, text="👤 ADD ADMIN", height=45, width=200, font=("Arial", 13, "bold"), fg_color="#3498DB", command=handle_add_admin).pack(anchor="w", padx=30, pady=10)
-
-
-def show_settings_content(content_area, responsive_manager):
-    """ Comprehensive system settings and configuration interface. """
-    header_frame = ctk.CTkFrame(content_area, fg_color="transparent")
-    header_frame.pack(fill="x", padx=30, pady=(20, 10))
-    
-    ctk.CTkLabel(header_frame, text="⚙️ SYSTEM SETTINGS & CONFIGURATION", 
-                 font=("Segoe UI", 32, "bold"), text_color="#3b9dd8").pack(anchor="w")
-    
-    settings_scroll = ctk.CTkFrame(content_area, fg_color="transparent")
-    settings_scroll.pack(fill="both", expand=True, padx=30, pady=(10, 20))
-    
-    # Appearance Section
-    appearance_section = ctk.CTkFrame(settings_scroll, fg_color="#9B59B6", corner_radius=10, height=45)
-    appearance_section.pack(fill="x", pady=(10, 15))
-    ctk.CTkLabel(appearance_section, text="🎨 APPEARANCE & THEME", font=("Arial", 16, "bold"), text_color="white").pack(pady=10)
-    
-    appearance_container = ctk.CTkFrame(settings_scroll, fg_color="#2c2c2c", corner_radius=12)
-    appearance_container.pack(fill="x", pady=(0, 20))
-    
-    dark_mode_row = ctk.CTkFrame(appearance_container, fg_color="#1a1a1a", corner_radius=8)
-    dark_mode_row.pack(fill="x", padx=20, pady=(20, 10))
-    ctk.CTkLabel(dark_mode_row, text="Dark Mode", font=("Arial", 13, "bold"), text_color="white").pack(side="left", padx=20, pady=15)
-    ctk.CTkSwitch(dark_mode_row, text="", fg_color="#9B59B6").pack(side="right", padx=20)
-    
-    save_frame = ctk.CTkFrame(settings_scroll, fg_color="transparent")
-    save_frame.pack(fill="x", pady=(20, 10))
-    ctk.CTkButton(save_frame, text="💾 SAVE ALL SETTINGS", fg_color="#2ECC71", text_color="black", height=55, font=("Arial", 16, "bold"), corner_radius=12).pack(fill="x", padx=20)

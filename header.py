@@ -62,6 +62,14 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
     controls_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
     controls_frame.grid(row=0, column=2, sticky="e")
 
+    import modify_live
+    refresh_btn = ctk.CTkButton(
+        controls_frame, text="🔄", width=40, height=40, corner_radius=20,
+        fg_color="#3498DB", hover_color="#2980B9", text_color="#000000",
+        font=("Arial", 14, "bold"), command=modify_live.trigger_live_refresh
+    )
+    refresh_btn.pack(side="right", padx=(0, 10))
+
     theme_btn = ctk.CTkButton(
         controls_frame, text="☀️", width=40, height=40, corner_radius=20,
         fg_color="#2ECC71", hover_color="#27AE60", text_color="#000000",

@@ -33,21 +33,43 @@ def show_early_comers_content(content_area, responsive_manager):
     table_scroll = ctk.CTkFrame(table_container, fg_color="transparent")
     table_scroll.pack(fill="both", expand=True, padx=5, pady=5)
     
-    # Mock Data
-    mock_data = [
-        ("Alice Wonder", "REG-001", "07:45 AM", "Computer Science", "Early"),
-        ("Bob Builder", "REG-002", "07:50 AM", "Engineering", "Early"),
-        ("Charlie Chap", "REG-003", "07:55 AM", "Mathematics", "Early"),
-    ]
+    # Fetch Real Data and Apply Configured Time Rule
+    from db import get_attendance_history
+    import admin_dashboard_files.config_manager as config_manager
+    from datetime import datetime
     
-    for name, reg, time, course, status in mock_data:
+    threshold_str = config_manager.get("late_arrival_time") # "08:30:00"
+    try:
+        threshold_time = datetime.strptime(threshold_str, "%H:%M:%S").time()
+    except:
+        threshold_time = datetime.strptime("08:30:00", "%H:%M:%S").time()
+        
+    all_attendance = get_attendance_history()
+    early_comers = []
+    
+    for row in all_attendance:
+        # Assuming database time_in is a timedelta or string
+        t_str = str(row['time_in'])
+        try:
+            arrival_time = datetime.strptime(t_str, "%H:%M:%S").time()
+            if arrival_time <= threshold_time:
+                early_comers.append((
+                    row['name'],
+                    row['reg_no'], 
+                    arrival_time.strftime("%I:%M %p"),
+                    row['course'],
+                    "Early"
+                ))
+        except: pass
+    
+    for name, reg, time_str, course, status in early_comers:
         row = ctk.CTkFrame(table_scroll, fg_color="#2c2c2c", corner_radius=5, height=40)
         row.pack(fill="x", pady=2)
         row.pack_propagate(False)
         
         ctk.CTkLabel(row, text=name).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=reg).pack(side="left", expand=True)
-        ctk.CTkLabel(row, text=time).pack(side="left", expand=True)
+        ctk.CTkLabel(row, text=time_str).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=course).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=status, text_color="#2ECC71").pack(side="left", expand=True)
 
@@ -83,19 +105,41 @@ def show_late_comers_content(content_area, responsive_manager):
     table_scroll = ctk.CTkFrame(table_container, fg_color="transparent")
     table_scroll.pack(fill="both", expand=True, padx=5, pady=5)
     
-    # Mock Data
-    mock_data = [
-        ("Dave Diver", "REG-055", "08:15 AM", "Biology", "Late"),
-        ("Eve Adams", "REG-067", "08:20 AM", "Physics", "Late"),
-    ]
+    # Fetch Real Data and Apply Configured Time Rule
+    from db import get_attendance_history
+    import admin_dashboard_files.config_manager as config_manager
+    from datetime import datetime
     
-    for name, reg, time, course, status in mock_data:
+    threshold_str = config_manager.get("late_arrival_time")
+    try:
+        threshold_time = datetime.strptime(threshold_str, "%H:%M:%S").time()
+    except:
+        threshold_time = datetime.strptime("08:30:00", "%H:%M:%S").time()
+        
+    all_attendance = get_attendance_history()
+    late_comers = []
+    
+    for row in all_attendance:
+        t_str = str(row['time_in'])
+        try:
+            arrival_time = datetime.strptime(t_str, "%H:%M:%S").time()
+            if arrival_time > threshold_time:
+                late_comers.append((
+                    row['name'],
+                    row['reg_no'], 
+                    arrival_time.strftime("%I:%M %p"),
+                    row['course'],
+                    "Late"
+                ))
+        except: pass
+    
+    for name, reg, time_str, course, status in late_comers:
         row = ctk.CTkFrame(table_scroll, fg_color="#2c2c2c", corner_radius=5, height=40)
         row.pack(fill="x", pady=2)
         row.pack_propagate(False)
         
         ctk.CTkLabel(row, text=name).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=reg).pack(side="left", expand=True)
-        ctk.CTkLabel(row, text=time).pack(side="left", expand=True)
+        ctk.CTkLabel(row, text=time_str).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=course).pack(side="left", expand=True)
         ctk.CTkLabel(row, text=status, text_color="#E74C3C").pack(side="left", expand=True)

@@ -5,9 +5,9 @@ from PIL import Image
 import header
 from admin_dashboard_files import (
     shared, home, generate_dataset, train_classifier, 
-    face_recognition, view_attendance, registration_page, 
+    face_recognition, view_attendance, admin_register_student, 
     update_users, upload_images, comers, 
-    settings_and_announcement, export_and_help
+    settings, announcements, export_and_help, add_admin
 )
 
 def create_admin_dashboard(parent_frame, on_logout_click, admin_data=None):
@@ -75,12 +75,11 @@ def create_admin_dashboard(parent_frame, on_logout_click, admin_data=None):
             ("📋 View Attendance", lambda: show_content(view_attendance.show_attendance_content)),
         ],
         "STUDENTS": [
-            ("➕ Register Student", lambda: show_content(lambda area, rm: registration_page.show_register_student_content(area, rm, on_logout_click))),
+            ("➕ Register Student", lambda: show_content(lambda area, rm: admin_register_student.show_register_student_content(area, rm))),
             ("🔄 Update Users", lambda: show_content(update_users.show_update_users_content)),
-            ("🖼️ Upload Images", lambda: show_content(upload_images.show_upload_images_content)),
         ],
         "MANAGEMENT": [
-            ("👤 Add Admin", lambda: show_content(settings_and_announcement.show_add_admin_content)),
+            ("👤 Add Admin", lambda: show_content(add_admin.show_add_admin_content)),
         ],
         "REPORTS": [
             ("🌅 Early Comers", lambda: show_content(comers.show_early_comers_content)),
@@ -88,8 +87,8 @@ def create_admin_dashboard(parent_frame, on_logout_click, admin_data=None):
             ("📥 Export Attendance", lambda: show_content(export_and_help.show_export_content)),
         ],
         "SYSTEM": [
-            ("📢 Announcement", lambda: show_content(lambda area, rm: settings_and_announcement.show_announcement_content(area, rm, admin_data))),
-            ("⚙️ Settings", lambda: show_content(settings_and_announcement.show_settings_content)),
+            ("📢 Announcement", lambda: show_content(lambda area, rm: announcements.show_announcement_content(area, rm, admin_data))),
+            ("⚙️ Settings", lambda: show_content(settings.show_settings_content)),
             ("❓ Help", lambda: show_content(export_and_help.show_help_content)),
         ]
     }

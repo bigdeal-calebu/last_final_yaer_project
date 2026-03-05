@@ -107,7 +107,7 @@ def check_admin(email, password):
             # Normalise: the table column is 'full_name'; expose as 'name' for the dashboard
             admin_name = admin.get('full_name') or admin.get('name') or admin.get('username') or "Admin"
             admin['name'] = admin_name          # always available as admin_data['name']
-            admin['photo_path'] = admin.get('image')  # always available as admin_data['photo_path']
+            admin['photo_path'] = admin.get('image_path')  # always available as admin_data['photo_path']
             return True, f"Admin login successful! Welcome {admin_name}", admin
         else:
             return False, "Invalid admin email or password", None
@@ -117,6 +117,38 @@ def check_admin(email, password):
         cursor.close()
         conn.close()
 # END check_admin
+
+# ------------------------------------------------------------------
+# add_new_admin(full_name, email, password, image_path=None)
+# PURPOSE : Insert a new administrative user into the admin table.
+#           Checks for duplicate emails before inserting.
+# RETURNS : (True, success_msg) or (False, error_msg)
+# ------------------------------------------------------------------
+def add_new_admin(full_name, email, password, image_path=None):
+    conn = get_connection()
+    if conn is None:
+        return False, "Database connection failed"
+    try:
+        cursor = conn.cursor()
+        
+        # Prevent completely identical names to stop accidental duplicate clicks
+        cursor.execute("SELECT id FROM admin WHERE email=%s", (email,))
+        if cursor.fetchone():
+            return False, "An administrator with that Email already exists."
+            
+        cursor.execute("""
+            INSERT INTO admin (full_name, email, password, image_path)
+            VALUES (%s, %s, %s, %s)
+        """, (full_name, email, password, image_path))
+        
+        conn.commit()
+        return True, "New administrator successfully registered!"
+    except Exception as e:
+        return False, f"Failed to register admin: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+# END add_new_admin
 
 
 # =================== HELPERS ===================
@@ -214,6 +246,125 @@ def update_student_details(reg_no, email, contact, password=None):
         cursor.close()
         conn.close()
 # END update_student_details
+
+
+# ------------------------------------------------------------------
+# update_full_student_record(original_reg_no, data_dict)
+# PURPOSE : Update all editable fields for a student from the admin dashboard.
+# RETURNS : (True, success_msg) or (False, error_msg)
+# ------------------------------------------------------------------
+def update_full_student_record(original_reg_no, data_dict):
+    conn = get_connection()
+    if conn is None: return False, "DB Connection Error"
+    
+    try:
+        cursor = conn.cursor()
+        
+        new_reg_no = data_dict.get('registration_no')
+        new_email = data_dict.get('email')
+        
+        # Check reg_no collision if it was renamed
+        if new_reg_no != original_reg_no:
+            cursor.execute("SELECT registration_no FROM students WHERE registration_no=%s", (new_reg_no,))
+            if cursor.fetchone():
+                return False, "New Registration Number belongs to another student."
+                
+        # Check email collision
+        cursor.execute("SELECT registration_no FROM students WHERE email=%s AND registration_no!=%s", (new_email, original_reg_no))
+        if cursor.fetchone():
+            return False, "Email address is already in use by another student."
+            
+        query = """
+            UPDATE students SET 
+                full_name=%s, registration_no=%s, email=%s, password=%s,
+                department=%s, year_level=%s, course=%s, session=%s, contact_number=%s
+            WHERE registration_no=%s
+        """
+        params = (
+            data_dict.get('full_name'),
+            new_reg_no,
+            new_email,
+            data_dict.get('password'),
+            data_dict.get('department'),
+            data_dict.get('year_level'),
+            data_dict.get('course'),
+            data_dict.get('session'),
+            data_dict.get('contact_number'),
+            original_reg_no
+        )
+        
+        cursor.execute(query, params)
+        conn.commit()
+        return True, "Student record updated successfully!"
+        
+    except Exception as e:
+        return False, str(e)
+    finally:
+        cursor.close()
+        conn.close()
+# END update_full_student_record
+
+
+
+# END update_full_student_record
+
+
+# =================== FORGOT PASSWORD ===================
+# ------------------------------------------------------------------
+# get_system_email_credentials()
+# PURPOSE : Get an admin's email and password to use as the SMTP sender
+# ------------------------------------------------------------------
+def get_system_email_credentials():
+    conn = get_connection()
+    if conn is None: return None, None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        # Just grab the first admin who has an email and password set
+        cursor.execute("SELECT email, password FROM admin WHERE email IS NOT NULL AND password IS NOT NULL LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            return row['email'], row['password']
+        return None, None
+    except:
+        return None, None
+    finally:
+        cursor.close()
+        conn.close()
+
+# ------------------------------------------------------------------
+# check_email_exists(email)
+# PURPOSE : Verifies if an email belongs to a registered student
+# ------------------------------------------------------------------
+def check_email_exists(email):
+    conn = get_connection()
+    if conn is None: return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT registration_no FROM students WHERE email=%s", (email,))
+        return cursor.fetchone() is not None
+    except:
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+# ------------------------------------------------------------------
+# update_password_by_email(email, new_password)
+# PURPOSE : Saves the newly reset password for the verified student
+# ------------------------------------------------------------------
+def update_password_by_email(email, new_password):
+    conn = get_connection()
+    if conn is None: return False, "DB connection failed"
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE students SET password=%s WHERE email=%s", (new_password, email))
+        conn.commit()
+        return True, "Password updated successfully"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =================== ATTENDANCE MANAGEMENT ===================

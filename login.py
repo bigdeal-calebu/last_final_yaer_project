@@ -3,7 +3,7 @@ from tkinter import messagebox
 from db import check_user, check_admin
 from header import create_header
 
-def create_login_ui(parent_frame, on_register_click=None, include_header=True, embedded=False, on_back_click=None, on_user_login_success=None, on_admin_login_success=None):
+def create_login_ui(parent_frame, on_register_click=None, include_header=True, embedded=False, on_back_click=None, on_user_login_success=None, on_admin_login_success=None, on_forgot_password_click=None):
 
     # ================= HEADER =================
     if include_header:
@@ -80,8 +80,13 @@ def create_login_ui(parent_frame, on_register_click=None, include_header=True, e
                 messagebox.showerror("Error", msg)
 
     # ================= LOGIN BUTTON =================
+    # ================= FORGOT PASSWORD LINK =================
     btn_login = ctk.CTkButton(input_frame, text="LOGIN", height=60, fg_color="#206a9c", font=("Arial", 18, "bold"), command=perform_login)
-    btn_login.pack(fill="x", pady=(20, 15))
+    btn_login.pack(fill="x", pady=(20, 10))
+
+    btn_forgot = ctk.CTkButton(input_frame, text="Forgot Password?", fg_color="transparent",
+                                 text_color="#F39C12", font=("Arial", 12, "bold"), hover_color="#333", command=on_forgot_password_click)
+    btn_forgot.pack(pady=(0, 5))
 
     # ================= REGISTER LINK =================
     btn_register = ctk.CTkButton(input_frame, text="Don't have an account? Register", fg_color="transparent",

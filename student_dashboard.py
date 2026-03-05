@@ -1,8 +1,9 @@
 import customtkinter as ctk
-from tkinter import messagebox
-from db import update_student_details
+from tkinter import messagebox, filedialog
+from db import update_student_details, update_student_photo
 from PIL import Image, ImageOps, ImageDraw
 import os
+import shutil
 
 import header
 
@@ -612,8 +613,56 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
         clear_content()
         show_header("EDIT DETAILS")
         
+        # --- Profile Photo Edit Section ---
+        photo_container = ctk.CTkFrame(content_area, fg_color="transparent")
+        photo_container.pack(fill="x", pady=(10, 0), padx=20)
+        
+        new_photo_path_var = ctk.StringVar(value="")
+        current_photo = student_data.get("image") or student_data.get("profile_image") or student_data.get("image_path")
+        
+        img_display_size = 90
+        photo_frame = ctk.CTkFrame(photo_container, width=img_display_size, height=img_display_size, corner_radius=img_display_size//2, fg_color="#0f0f0f", border_width=2, border_color="#2ECC71")
+        photo_frame.pack(side="left", padx=(0, 20))
+        photo_frame.pack_propagate(False)
+        img_lbl = ctk.CTkLabel(photo_frame, text="👤", font=("Arial", 35), text_color="#2ECC71")
+        img_lbl.place(relx=0.5, rely=0.5, anchor="center")
+
+        def load_preview(path):
+            if path and os.path.exists(path):
+                try:
+                    pil_img = Image.open(path).convert("RGBA")            
+                    pil_img = ImageOps.fit(pil_img, (img_display_size, img_display_size), centering=(0.5, 0.5))
+                    mask = Image.new("L", (img_display_size, img_display_size), 0)
+                    draw = ImageDraw.Draw(mask)
+                    draw.ellipse((0, 0, img_display_size, img_display_size), fill=255)
+                    pil_img.putalpha(mask)
+                    preview_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(img_display_size, img_display_size))
+                    img_lbl.configure(image=preview_img, text="")
+                    img_lbl.image = preview_img
+                except Exception as e:
+                    print(f"Error loading preview: {e}")
+
+        load_preview(current_photo)
+
+        def choose_photo():
+            file_path = filedialog.askopenfilename(
+                title="Select Profile Picture",
+                filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+            )
+            if file_path:
+                new_photo_path_var.set(file_path)
+                load_preview(file_path)
+
+        photo_actions = ctk.CTkFrame(photo_container, fg_color="transparent")
+        photo_actions.pack(side="left", fill="y", pady=10)
+        
+        ctk.CTkLabel(photo_actions, text="Update Profile Picture", font=("Arial", 14, "bold"), text_color="white").pack(anchor="w")
+        ctk.CTkLabel(photo_actions, text="Recommended size: 200x200px (JPG or PNG)", font=("Arial", 11), text_color="gray").pack(anchor="w", pady=(0, 10))
+        ctk.CTkButton(photo_actions, text="Choose Photo", fg_color="#3498db", hover_color="#2980b9", width=120, height=32, font=("Arial", 12, "bold"), command=choose_photo).pack(anchor="w")
+        # ----------------------------------
+        
         form_frame = ctk.CTkFrame(content_area, fg_color="#1f1f1f", corner_radius=15)
-        form_frame.pack(fill="x", pady=10, padx=20)
+        form_frame.pack(fill="x", pady=20, padx=20)
         
         # Grid layout for form
         form_frame.columnconfigure(0, weight=1)
@@ -640,23 +689,51 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
 
         # ------------------------------------------------------------------
         # save_changes()
-        # PURPOSE : Read new email, contact, and optional password from the
-        #           form entries, validate them, then call
-        #           update_student_details() to persist them in the database.
+        # PURPOSE : Validate entries, persist data to DB, and copy/save 
+        #           uploaded image to local file system. Update local 
+        #           variables so the change visibly reflects immediately.
         # ------------------------------------------------------------------
         def save_changes():
             new_email = entries["email_entry"].get()
             new_contact = entries["contact_entry"].get()
             new_pass = entries["pass_entry"].get()
+            selected_photo = new_photo_path_var.get()
             
             if not new_email or not new_contact:
                 messagebox.showerror("Error", "Email and Contact are required!")
                 return
                 
             success, msg = update_student_details(reg_no, new_email, new_contact, new_pass if new_pass else None)
+            
             if success:
-                messagebox.showinfo("Success", "Details updated! Please re-login to see changes.")
-                # Ideally update local variables or force logout. For now just msg.
+                nonlocal email, contact, photo_path
+                email = new_email
+                contact = new_contact
+                student_data['email'] = new_email
+                student_data['contact_number'] = new_contact
+                
+                # Process photo if selected
+                if selected_photo:
+                    target_dir = os.path.join(os.path.dirname(__file__), "profile_pics")
+                    os.makedirs(target_dir, exist_ok=True)
+                    ext = os.path.splitext(selected_photo)[1]
+                    # safe filename
+                    safe_reg_no = str(reg_no).replace("/", "_").replace("\\", "_")
+                    target_path = os.path.join(target_dir, f"{safe_reg_no}_profile{ext}")
+                    
+                    try:
+                        shutil.copy2(selected_photo, target_path)
+                        photo_success, photo_msg = update_student_photo(reg_no, target_path)
+                        if photo_success:
+                            photo_path = target_path
+                            student_data['image_path'] = target_path
+                            student_data['profile_image'] = target_path
+                            student_data['image'] = target_path
+                    except Exception as e:
+                        print("Error copying/saving photo:", e)
+
+                messagebox.showinfo("Success", "Details updated successfully!")
+                show_profile() # Redirect immediately to profile to see the new image
             else:
                 messagebox.showerror("Error", msg)
         # END save_changes

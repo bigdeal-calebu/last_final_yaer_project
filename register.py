@@ -8,7 +8,7 @@ import re
 from header import create_header
 from db import get_connection
 
-def show_registration_page(root, on_user_login=None, on_admin_login=None):
+def show_registration_page(root, on_user_login=None, on_admin_login=None, include_header=True):
 
     # --- 1. SETTINGS & CONFIG ---
     field_config = {
@@ -29,8 +29,9 @@ def show_registration_page(root, on_user_login=None, on_admin_login=None):
     selected_image_path = None
 
     # --- 2. HEADER ---
-    header = create_header(root, title_text="Smart Attendance System", subtitle_text="Student Registration")
-    header.pack(fill="x", side="top")
+    if include_header:
+        header = create_header(root, title_text="Smart Attendance System", subtitle_text="Student Registration")
+        header.pack(fill="x", side="top")
 
     # --- 3. LOGIC FUNCTIONS ---
 
@@ -167,11 +168,19 @@ def show_registration_page(root, on_user_login=None, on_admin_login=None):
                     con.close()
 
     # --- 4. UI CONSTRUCTION ---
-    shadow_frame = ctk.CTkFrame(root, fg_color="#0f0f0f", corner_radius=40)
-    shadow_frame.pack(expand=True, fill="both", padx=60, pady=20)
-
-    main_container = ctk.CTkFrame(shadow_frame, fg_color="#1f1f1f", corner_radius=30, border_width=2, border_color="#333333")
-    main_container.pack(fill="both", expand=True, padx=15, pady=15)
+    if include_header:
+        # Full-page standalone screen uses a heavy center-aligned shadow box
+        shadow_frame = ctk.CTkFrame(root, fg_color="#0f0f0f", corner_radius=40)
+        shadow_frame.pack(expand=True, fill="both", padx=60, pady=20)
+        
+        main_container = ctk.CTkFrame(shadow_frame, fg_color="#1f1f1f", corner_radius=30, border_width=2, border_color="#333333")
+        main_container.pack(fill="both", expand=True, padx=15, pady=15)
+    else:
+        # Admin dashboard embeds directly without extra wrapping shadows
+        shadow_frame = ctk.CTkFrame(root, fg_color="transparent")
+        shadow_frame.pack(fill="both", expand=True)
+        main_container = ctk.CTkFrame(shadow_frame, fg_color="transparent")
+        main_container.pack(fill="both", expand=True, padx=30, pady=10)
 
     title_label = ctk.CTkLabel(main_container, text="CREATE ACCOUNT", text_color="#2ECC71", font=("Segoe UI", 26, "bold"))
     title_label.pack(pady=(20, 10))
@@ -186,7 +195,12 @@ def show_registration_page(root, on_user_login=None, on_admin_login=None):
     progress_label = ctk.CTkLabel(progress_wrapper, text="0%")
     progress_label.pack(side="right", padx=10)
 
-    scroll_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+    if include_header:
+        scroll_frame = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+    else:
+        # Avoid nested scrollbars inside the admin dashboard
+        scroll_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        
     scroll_frame.pack(fill="both", expand=True, padx=20)
 
     for label_text in labels_text:
@@ -221,17 +235,24 @@ def show_registration_page(root, on_user_login=None, on_admin_login=None):
     btn_container.pack(fill="x", pady=20)
 
     btn_reg = ctk.CTkButton(btn_container, text="Register", command=submit, fg_color="#2ECC71", hover_color="#27AE60", height=45)
-    btn_login = ctk.CTkButton(btn_container, text="Login", command=on_admin_login, fg_color="#3498DB", hover_color="#2980B9", height=45)
+    
+    # Only show 'Login' button if we are NOT inside the admin dashboard
+    if include_header:
+        btn_login = ctk.CTkButton(btn_container, text="Login", command=on_user_login, fg_color="#3498DB", hover_color="#2980B9", height=45)
 
     def adjust_button_layout(event):
         width = event.width
         btn_reg.pack_forget()
-        btn_login.pack_forget()
+        if include_header: btn_login.pack_forget()
+        
         if width < 600:
             btn_reg.pack(fill="x", padx=40, pady=5)
-            btn_login.pack(fill="x", padx=40, pady=5)
+            if include_header: btn_login.pack(fill="x", padx=40, pady=5)
         else:
-            btn_reg.pack(side="left", expand=True, padx=20)
-            btn_login.pack(side="right", expand=True, padx=20)
+            if include_header:
+                btn_reg.pack(side="left", expand=True, padx=20)
+                btn_login.pack(side="right", expand=True, padx=20)
+            else:
+                btn_reg.pack(expand=True, padx=20) # Center the lone register button natively
 
     btn_container.bind("<Configure>", adjust_button_layout)

@@ -1,0 +1,122 @@
+Camera Resolution
+
+Capture at high resolution (720p, 1080p, or higher)
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+2. Frame Rate (FPS)
+
+Set FPS for smoother motion (cap.set(cv2.CAP_PROP_FPS, 30))
+
+High FPS reduces motion blur
+
+3. Camera Focus and Exposure
+
+Control focus if supported
+
+Control exposure: cap.set(cv2.CAP_PROP_EXPOSURE, value)
+
+4. Camera Encoding (FOURCC)
+
+Use MJPG or YUYV for higher-quality video stream
+
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+
+5. Brightness and Contrast Adjustment
+
+Adjust using cv2.convertScaleAbs(frame, alpha, beta)
+
+Enhances visibility in dark or overly bright scenes
+
+6. Gamma Correction
+
+Corrects under/overexposed frames
+
+gamma = 1.2
+lookUpTable = np.array([((i/255.0)**(1/gamma))*255 for i in np.arange(0,256)]).astype("uint8")
+frame = cv2.LUT(frame, lookUpTable)
+7. Noise Reduction
+
+cv2.fastNlMeansDenoisingColored() for color frames
+
+cv2.GaussianBlur() or cv2.bilateralFilter() for edge-preserving smoothing
+
+8. Sharpening
+
+Using kernel convolution (cv2.filter2D)
+
+Makes edges crisper and details clearer
+
+9. Histogram Equalization
+
+Improves contrast in grayscale frames (cv2.equalizeHist())
+
+Use CLAHE for color images (cv2.createCLAHE())
+
+10. White Balance Correction
+
+Ensures natural color tones
+
+Adjust channels based on lighting
+
+11. Color Space Conversion
+
+Convert to appropriate color space (BGR→RGB, BGR→LAB) for better processing
+
+Helps with contrast and color correction
+
+12. CLAHE (Contrast Limited Adaptive Histogram Equalization)
+
+Prevents over-enhancement in bright areas
+
+Gives more uniform contrast
+
+13. Resize with Proper Interpolation
+
+Use cv2.INTER_CUBIC for upscaling
+
+Use cv2.INTER_AREA for downscaling
+
+Avoids pixelation
+
+14. Real-time Image Stabilization
+
+Reduce shake using optical flow (cv2.calcOpticalFlowPyrLK)
+
+Stabilized frames appear sharper
+
+15. Dynamic Range/HDR
+
+Merge multiple exposures for high contrast scenes
+
+Reduces blown-out highlights
+
+16. Edge Enhancement
+
+Using Laplacian filter or sharpening kernel
+
+Makes details stand out
+
+17. Dithering & Anti-aliasing
+
+Reduces jagged edges in scaled frames
+
+18. Threaded Video Capture
+
+Use multithreading to separate frame capture and processing
+
+Increases FPS and reduces lag
+
+19. GPU Acceleration
+
+Use OpenCV CUDA modules for filters and processing
+
+Faster processing = smoother, high-quality video
+
+20. Proper Lighting
+
+Not OpenCV-specific, but crucial
+
+Good lighting reduces noise and improves color fidelity

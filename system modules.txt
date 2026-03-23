@@ -1,0 +1,504 @@
+1. main.py (System Entry Module)
+
+This is the starting point of the entire system.
+
+What happens inside this module
+
+Creates the main application window using Tkinter / CustomTkinter.
+
+Defines the main container where all pages load.
+
+Controls page switching between:
+
+registration
+
+login
+
+dashboards
+
+Calls functions like:
+
+load_registration()
+
+load_login()
+
+Initializes the UI layout.
+
+Loads global resources like fonts, colors, and images.
+
+Main responsibility
+Start the program and control page navigation
+2. login.py (User Authentication Module)
+
+This module handles user login functionality.
+
+What happens in this module
+
+Creates the login user interface.
+
+Displays:
+
+email field
+
+password field
+
+Handles login button actions.
+
+Connects to the database through:
+
+db.py
+
+Calls functions:
+
+check_user()
+
+check_admin()
+
+After successful login
+
+It redirects users to:
+
+student_dashboard.py
+or
+admin_dashboard.py
+Additional features
+
+Forgot password link.
+
+Input validation.
+
+Error messages.
+
+3. register.py (User Registration Module)
+
+Handles creation of new accounts.
+
+What happens here
+
+Creates registration form.
+
+Collects:
+
+name
+
+email
+
+password
+
+Validates user inputs.
+
+Saves user data into the database through:
+
+db.py
+Functions inside
+
+Create registration UI
+
+Validate inputs
+
+Insert user into database
+
+4. forgot_password.py (Password Recovery Module)
+
+Handles password reset process.
+
+What happens here
+
+Displays password recovery form.
+
+Asks for:
+
+email
+
+verification information
+
+Verifies user from database.
+
+Allows password update.
+
+Flow
+Login → Forgot Password → Reset Password → Login
+5. db.py (Database Communication Module)
+
+This module is very important.
+
+Responsibilities
+
+Handles all database operations.
+
+Operations inside
+
+Database connection
+
+Query execution
+
+Data retrieval
+
+Data insertion
+
+Functions include
+check_user()
+check_admin()
+insert_user()
+update_password()
+get_attendance()
+Used by
+login.py
+register.py
+admin modules
+student modules
+6. student_dashboard.py (Student Interface)
+
+This module creates the student control panel.
+
+What happens here
+
+Displays student dashboard with features like:
+
+Student profile
+
+Attendance history
+
+Notifications
+
+Start attendance recognition
+
+Functions
+
+Create dashboard layout
+
+Load attendance data
+
+Display student info
+
+7. admin_dashboard.py (Admin Control Panel)
+
+This module builds the admin dashboard interface.
+
+Responsibilities
+
+Creates the admin control panel.
+
+Displays menu for:
+
+registering students
+
+managing attendance
+
+generating reports
+
+managing admins
+
+Loads submodules from
+admin_dashboard_files/
+8. header.py (Top Navigation Module)
+
+This module creates the header section of the interface.
+
+Responsibilities
+
+Displays system title
+
+Displays logo
+
+Displays navigation buttons
+
+Adds consistent UI header across pages
+
+9. layout.py (UI Layout Manager)
+
+Controls layout structure of the dashboard.
+
+Responsibilities
+
+Define grid layouts
+
+Arrange UI components
+
+Control page spacing
+
+Handle responsive UI behavior
+
+10. modify_live.py (Live Camera Control Module)
+
+This module helps manage live camera updates.
+
+Responsibilities
+
+Refresh UI while camera is running.
+
+Prevent Tkinter from freezing.
+
+Allow camera to run in GUI window.
+
+Functions inside manage:
+
+camera refresh
+frame updating
+UI synchronization
+11. admin_dashboard_files/face_recognition.py
+
+Handles real-time face recognition.
+
+Responsibilities
+
+Open camera
+
+Detect faces using Haar Cascade Classifier
+
+Recognize faces using trained model
+
+Match student IDs
+
+Trigger attendance recording
+
+12. admin_dashboard_files/generate_dataset.py
+
+This module captures student face images.
+
+Responsibilities
+
+Open camera
+
+Capture multiple student images
+
+Detect face
+
+Save images inside:
+
+train_images/
+
+Example output:
+
+train_images/studentID/
+13. admin_dashboard_files/train_classifier.py
+
+This module trains the face recognition model.
+
+Responsibilities
+
+Load images from train_images
+
+Convert images to grayscale
+
+Extract facial features
+
+Train the model using Local Binary Patterns Histograms
+
+Save trained model inside:
+
+models/
+14. admin_dashboard_files/admin_register_student.py
+
+Allows admin to add new students.
+
+Responsibilities
+
+Display student registration form
+
+Collect student details
+
+Save student info in database
+
+Optionally capture student images
+
+15. admin_dashboard_files/add_admin.py
+
+Handles creation of new admin accounts.
+
+Responsibilities
+
+Admin registration form
+
+Insert admin into database
+
+Manage admin privileges
+
+16. admin_dashboard_files/update_users.py
+
+Allows admin to edit user information.
+
+Responsibilities
+
+Modify student details
+
+Modify admin details
+
+Update database records
+
+17. admin_dashboard_files/view_attendance.py
+
+Displays attendance records.
+
+Responsibilities
+
+Fetch attendance from database
+
+Display table of attendance
+
+Filter by:
+
+date
+
+student
+
+course
+
+18. admin_dashboard_files/comers.py
+
+Handles students entering attendance area.
+
+Responsibilities
+
+Show students detected by camera
+
+Display recognized students
+
+Monitor attendance entry
+
+19. admin_dashboard_files/announcements.py
+
+Allows admin to create announcements.
+
+Responsibilities
+
+Post announcements
+
+Display notices to students
+
+Save announcements in database
+
+20. admin_dashboard_files/settings.py
+
+System configuration module.
+
+Responsibilities
+
+System settings
+
+Camera settings
+
+Model configuration
+
+UI preferences
+
+21. admin_dashboard_files/config_manager.py
+
+Handles system configuration values.
+
+Responsibilities
+
+Load configuration
+
+Save configuration
+
+Manage system parameters
+
+22. admin_dashboard_files/shared.py
+
+Contains shared helper functions.
+
+Responsibilities
+
+Utility functions
+
+Reusable components
+
+Shared UI elements
+
+23. admin_dashboard_files/export_and_help.py
+
+Handles data export and help section.
+
+Responsibilities
+
+Export attendance to:
+
+Excel
+
+CSV
+
+Provide system help documentation
+
+24. admin_dashboard_files/home.py
+
+Creates admin dashboard home page.
+
+Responsibilities
+
+Display dashboard overview
+
+Show system statistics
+
+Quick navigation
+
+25. admin_dashboard_files/upload_images.py
+
+Allows admin to upload student images manually.
+
+Responsibilities
+
+Select image files
+
+Store them in training dataset
+
+Prepare images for model training
+
+Other important folders
+
+These are data folders used by modules.
+
+cascade/
+
+Contains:
+
+haarcascade_frontalface_default.xml
+
+Used for face detection.
+
+train_images/
+
+Stores student face images used for training.
+
+models/
+
+Stores trained face recognition models.
+
+unknowns/
+
+Stores faces that the system could not recognize.
+
+database/
+
+Contains database scripts such as:
+
+face_recognition.sql
+Complete System Module Structure
+main.py
+│
+├ login.py
+├ register.py
+├ forgot_password.py
+├ db.py
+├ student_dashboard.py
+├ admin_dashboard.py
+├ header.py
+├ layout.py
+├ modify_live.py
+│
+└ admin_dashboard_files
+     ├ add_admin.py
+     ├ admin_register_student.py
+     ├ announcements.py
+     ├ comers.py
+     ├ config_manager.py
+     ├ export_and_help.py
+     ├ face_recognition.py
+     ├ generate_dataset.py
+     ├ home.py
+     ├ settings.py
+     ├ shared.py
+     ├ train_classifier.py
+     ├ update_users.py
+     ├ upload_images.py
+     └ view_attendance.py

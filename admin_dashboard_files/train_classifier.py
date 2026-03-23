@@ -4,8 +4,10 @@ from PIL import Image
 import os
 import cv2
 import threading
+import json
 import numpy as np
-from admin_dashboard_files.shared import LABEL_MAP_PATH, reload_classifier, load_label_map, train_all_students_bg
+from admin_dashboard_files.shared import start_camera_stream as _scs # not used but for safety
+from admin_dashboard_files.face_recognition import LABEL_MAP_PATH, reload_classifier, load_label_map, train_all_students_bg
 
 def show_train_classifier_content(content_area, responsive_manager):
 
@@ -23,21 +25,19 @@ def show_train_classifier_content(content_area, responsive_manager):
     id_row = ctk.CTkFrame(id_card, fg_color="transparent")
     id_row.pack(fill="x", padx=40, pady=(10, 20))
 
-    train_id_entry = ctk.CTkEntry(id_row, placeholder_text="2023-08-16868",
-                                  height=42, font=("Arial", 13))
+    train_id_entry = ctk.CTkEntry(id_row, placeholder_text="2023-08-16868",height=42, font=("Arial", 13))
     train_id_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
     def refresh_hint():
         base = "train_images"
         if os.path.isdir(base):
-            folders = [f for f in os.listdir(base)
-                       if os.path.isdir(os.path.join(base, f))]
-            hint.configure(text="Available: " + ", ".join(folders) if folders else "No datasets found")
+            # Look for .npy files instead of folders
+            student_ids = [f[:-4] for f in os.listdir(base) if f.endswith(".npy")]
+            hint.configure(text="Available: " + ", ".join(student_ids) if student_ids else "No datasets found")
         else:
             hint.configure(text="No train_images folder found — generate dataset first")
 
-    scan_btn = ctk.CTkButton(id_row, text="🔍 Scan", width=80, height=42,
-                             fg_color="#333", hover_color="#444", command=refresh_hint)
+    scan_btn = ctk.CTkButton(id_row, text="🔍 Scan", width=80, height=42,fg_color="#333", hover_color="#444", command=refresh_hint)
     scan_btn.pack(side="left")
 
     hint = ctk.CTkLabel(id_card, text="Click 🔍 Scan to see available student IDs",
@@ -47,53 +47,45 @@ def show_train_classifier_content(content_area, responsive_manager):
     card = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=15)
     card.pack(fill="x", padx=50, pady=10)
 
-    ctk.CTkLabel(card, text="Training Status",
-                 font=("Arial", 16, "bold"), text_color="gray").pack(pady=(20, 10))
-    status_label = ctk.CTkLabel(card, text="Enter a Student ID and press Train.",
-                                font=("Arial", 20), text_color="white")
+    ctk.CTkLabel(card, text="Training Status",font=("Arial", 16, "bold"), text_color="gray").pack(pady=(20, 10))
+    status_label = ctk.CTkLabel(card, text="Enter a Student ID and press Train.", font=("Arial", 20), text_color="white")
     status_label.pack(pady=10)
 
-    progress = ctk.CTkProgressBar(card, width=400, height=20,
-                                  corner_radius=10, progress_color="#3498DB")
+    progress = ctk.CTkProgressBar(card, width=400, height=20, corner_radius=10, progress_color="#3498DB")
     progress.pack(pady=20)
     progress.set(0)
 
-    info_label = ctk.CTkLabel(card,
-                              text="Images will be loaded from  train_images/<student_id>/",
-                              font=("Arial", 12), text_color="gray")
+    info_label = ctk.CTkLabel(card,text="Data loaded from train_images/<student_id>.npy",font=("Arial", 12), text_color="gray")
     info_label.pack(pady=(0, 20))
 
-    def run_training_thread(student_id, data_dir):
+    def run_training_thread(student_id, file_path):
         try:
-            image_files = [
-                os.path.join(data_dir, f)
-                for f in os.listdir(data_dir)
-                if f.lower().endswith((".jpg", ".jpeg", ".png"))
-            ]
-            total_files = len(image_files)
+            # Load the .npy file
+            data = np.load(file_path)
+            total_samples = len(data)
 
-            if total_files == 0:
+            if total_samples == 0:
                 content_area.after(0, lambda: messagebox.showerror(
-                    "No Data", f"No images found in:\n{data_dir}\n\nPlease generate a dataset first."))
-                content_area.after(0, lambda: reset_ui("Error: No images found"))
+                    "No Data", f"No data found in:\n{file_path}\n\nPlease generate a dataset first."))
+                content_area.after(0, lambda: reset_ui("Error: No data found"))
                 return
 
             faces, ids = [], []
             numeric_label = abs(hash(student_id)) % 100000
 
-            for i, image_path in enumerate(image_files):
+            for i, row in enumerate(data):
                 try:
-                    img_gray = Image.open(image_path).convert("L")
-                    img_np   = np.array(img_gray, "uint8")
+                    # Reshape flattened row back to 100x100 grayscale image
+                    img_np = row.reshape((100, 100)).astype("uint8")
                     faces.append(img_np)
                     ids.append(numeric_label)
                 except Exception:
                     continue
 
-                if i % 5 == 0 or i == total_files - 1:
-                    prog_val = (i + 1) / total_files
+                if i % 10 == 0 or i == total_samples - 1:
+                    prog_val = (i + 1) / total_samples
                     content_area.after(0, lambda v=prog_val: progress.set(v))
-                    content_area.after(0, lambda v=i + 1, t=total_files: info_label.configure(text=f"Processing image {v} of {t}..."))
+                    content_area.after(0, lambda v=i + 1, t=total_samples: info_label.configure(text=f"Processing sample {v} of {t}..."))
 
             content_area.after(0, lambda: status_label.configure(text="Training model...", text_color="#F39C12"))
 
@@ -144,15 +136,15 @@ def show_train_classifier_content(content_area, responsive_manager):
         if not student_id:
             messagebox.showerror("Missing ID", "Please enter the Student ID you want to train.")
             return
-        data_dir = os.path.join("train_images", student_id)
-        if not os.path.isdir(data_dir):
-            messagebox.showerror("Folder Not Found", f"No dataset folder found for:\n{student_id}")
+        file_path = os.path.join("train_images", f"{student_id}.npy")
+        if not os.path.exists(file_path):
+            messagebox.showerror("File Not Found", f"No dataset file found for:\n{student_id}.npy")
             return
         btn_train.configure(state="disabled", text="⏳ Training...")
-        status_label.configure(text=f"Loading images for {student_id}...", text_color="#3498DB")
+        status_label.configure(text=f"Loading data for {student_id}...", text_color="#3498DB")
         progress.set(0)
-        info_label.configure(text=f"Reading from  train_images/{student_id}/")
-        t = threading.Thread(target=run_training_thread, args=(student_id, data_dir))
+        info_label.configure(text=f"Reading from train_images/{student_id}.npy")
+        t = threading.Thread(target=run_training_thread, args=(student_id, file_path))
         t.daemon = True
         t.start()
 

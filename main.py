@@ -1,7 +1,17 @@
+import os
+# Silencing OpenCV technical noise/warnings universally
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
+
 import customtkinter as ctk
 import modify_live
+import db
 
 def main():
+    # 0. Initialize Database (once at startup)
+    db.initialize_database()
+    
     ctk.set_appearance_mode("Dark")
     root = ctk.CTk()
     root.title("Smart Attendance System")

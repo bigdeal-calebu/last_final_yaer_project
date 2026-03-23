@@ -1,0 +1,130 @@
+Complete System Flow (Very Important)
+main.py
+   │
+   │
+   ▼
+Registration Page
+(register.py)
+   │
+   │
+   ▼
+Login Page
+(login.py)
+   │
+   ├── Forgot Password
+   │        │
+   │        ▼
+   │   forgot_password.py
+   │
+   │
+   ├── Student Login
+   │        │
+   │        ▼
+   │   student_dashboard.py
+   │        │
+   │        ▼
+   │   Face Recognition Attendance
+   │
+   │
+   └── Admin Login
+            │
+            ▼
+       admin_dashboard.py
+            │
+            ▼
+     admin_dashboard_files
+        ├── add_admin
+        ├── register_student
+        ├── announcements
+        └── attendance
+
+
+
+
+How the Face Attendance Works (Concept)
+Camera Opens
+     │
+Detect Face
+     │
+Compare with train_images
+     │
+Match Found?
+     │
+ ┌──Yes───────────┐
+ │                │
+Mark Attendance   │
+ │                │
+ └───────────────No
+                  │
+          Save to unknowns
+
+
+
+The Most Important Files in Your Project
+If you want to understand the whole system, focus on these files:
+main.py
+login.py
+register.py
+student_dashboard.py
+admin_dashboard.py
+db.py
+modify_live.py
+
+
+
+Complete Project Architecture
+Your whole project can be summarized like this:
+
+                 main.py
+                    │
+                    ▼
+          ┌───────────────────┐
+          │   Authentication   │
+          │                   │
+          │ register.py       │
+          │ login.py          │
+          │ forgot_password   │
+          └─────────┬─────────┘
+                    │
+         ┌──────────┴──────────┐
+         │                     │
+         ▼                     ▼
+ Student Dashboard      Admin Dashboard
+ student_dashboard.py   admin_dashboard.py
+         │                     │
+         ▼                     ▼
+  Face Recognition        Admin Modules
+         │                     │
+         ▼                     ▼
+     OpenCV Camera        Student Management
+         │
+         ▼
+ Face Detection
+ (Haar Cascade)
+         │
+         ▼
+ Face Recognition Model
+         │
+         ▼
+ Attendance Database
+
+
+
+Recognition Process (Real Time)
+When the camera runs, the following pipeline happens:
+Camera Frame
+      │
+      ▼
+Convert to Gray Image
+      │
+      ▼
+Detect Face
+      │
+      ▼
+Crop Face
+      │
+      ▼
+Send to Recognition Model
+      │
+      ▼
+Predict Label

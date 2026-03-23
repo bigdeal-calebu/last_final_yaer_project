@@ -11,7 +11,7 @@ DEFAULT_CONFIG = {
     "detection_scale": 0.75,
     
     # Recognition Params
-    "confidence_threshold": 60,
+    "confidence_threshold": 85,  # LBPH distance — lower is stricter; 85 is a good default
     "capture_unknowns": True,
     "unknown_frames_to_capture": 15,
     

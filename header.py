@@ -84,8 +84,7 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
     # ------------------------------------------------------------------
     def update_logo_image(size):
         try:
-            path = r"C:\Users\BIGDEAL CALEBU\Desktop\2026_final_special\logo.png"
-            if not os.path.exists(path): path = "logo.png"
+            path = "logo.png"
             if os.path.exists(path):
                 img = Image.open(path)
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(size, size))

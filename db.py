@@ -10,10 +10,11 @@ from mysql.connector import Error
 def get_connection():
     try:
         conn = mysql.connector.connect(
-            host="localhost",
+            host="127.0.0.1",
             user="root",
             password="",
-            database="face_recognition" # The updated db name from earlier script versions
+            database="face_recognition",
+            connect_timeout=5
         )
         return conn
     except Error as e:
@@ -612,7 +613,66 @@ def get_student_email_by_regno(reg_no):
         cursor.close()
         conn.close()
 
-# Ensure tables exist on import
-create_attendance_table()
-create_announcement_table()
-create_read_announcements_table()
+# ------------------------------------------------------------------
+# initialize_database()
+# PURPOSE : Ensure all necessary tables exist in the database.
+#           Called once at application startup.
+# ------------------------------------------------------------------
+def initialize_database():
+    print("[DB] Initializing Database...")
+    conn = get_connection()
+    if conn is None:
+        print("[DB] Critical Error: Could not connect to database for initialization.")
+        return
+    try:
+        cursor = conn.cursor()
+        
+        # 1. Attendance Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                reg_no VARCHAR(50) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                course VARCHAR(150),
+                program VARCHAR(100),
+                department VARCHAR(100),
+                date DATE NOT NULL,
+                time_in TIME NOT NULL,
+                time_out TIME,
+                status VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 2. Announcements Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                audience VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 3. Read Announcements Tracking
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_read_announcements (
+                student_reg_no VARCHAR(50) NOT NULL,
+                announcement_id INT NOT NULL,
+                action VARCHAR(20) DEFAULT 'deleted',
+                action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (student_reg_no, announcement_id)
+            )
+        """)
+        
+        conn.commit()
+        print("[DB] Database initialization complete.")
+    except Exception as e:
+        print(f"[DB] Error during initialization: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+if __name__ == "__main__":
+    initialize_database()

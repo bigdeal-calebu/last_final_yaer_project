@@ -78,7 +78,7 @@ def show_generate_dataset_content(content_area, responsive_manager):
     count_label = ctk.CTkLabel(controls_frame, text="0 / 100", font=("Arial", 14))
     count_label.pack(pady=5)
 
-    # ---------------- RIGHT PANEL (CAMERA VIEW - MEDIUM SIZE) ----------------
+    # ---------------- RIGHT PANEL ----------------
     camera_frame = ctk.CTkFrame(main_frame, fg_color="#1a1a1a", corner_radius=15, width=480, height=360)
     camera_frame.pack(side="right", padx=15, pady=15)
     camera_frame.pack_propagate(False)
@@ -146,11 +146,10 @@ def show_generate_dataset_content(content_area, responsive_manager):
                     if min(similarities) < 8:
                         continue
                 face_data.append(face_gray)
-                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 79, 255), 2)  # Blue box while capturing
+                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 79, 255), 2)
             else:
-                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (255, 79, 0), 2)  # Orange box before start
+                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (255, 79, 0), 2)
 
-        # Update progress
         if is_capturing:
             progress = len(face_data) / max_faces
             progress_bar.set(progress)
@@ -159,7 +158,6 @@ def show_generate_dataset_content(content_area, responsive_manager):
                 is_capturing = False
                 save_dataset()
 
-        # Update viewport
         img = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(img)
         img = ImageTk.PhotoImage(img)
@@ -174,12 +172,24 @@ def show_generate_dataset_content(content_area, responsive_manager):
         if len(face_data) > 0:
             if not os.path.exists("train_images"):
                 os.makedirs("train_images")
+
             file_path = f"train_images/{student_id}.npy"
+
+            # ✅ ADDED: BLOCK DUPLICATE SAVE
+            if os.path.exists(file_path):
+                status_label.configure(
+                    text="❌ Student ID already exists! Use another ID.",
+                    text_color="red"
+                )
+                face_data.clear()
+                return
+
             data_arr = np.asarray(face_data).reshape((len(face_data), -1))
             if os.path.exists(file_path):
                 old_data = np.load(file_path)
                 data_arr = np.vstack((old_data, data_arr))
             np.save(file_path, data_arr)
+
             status_label.configure(text=f"Dataset saved for {student_id}", text_color="#2ECC71")
             face_data.clear()
             id_entry.delete(0, "end")
@@ -188,11 +198,21 @@ def show_generate_dataset_content(content_area, responsive_manager):
     def start_capture():
         nonlocal is_capturing, face_data
         student_id = id_entry.get().strip()
+
         if not student_id:
             status_label.configure(text="Enter a valid Student ID!", text_color="red")
             return
 
-        face_data = []  # Reset for new capture
+        # ✅ ADDED: BLOCK DUPLICATE BEFORE CAPTURE
+        file_path = f"train_images/{student_id}.npy"
+        if os.path.exists(file_path):
+            status_label.configure(
+                text="❌ Student ID already exists! Use another ID.",
+                text_color="red"
+            )
+            return
+
+        face_data = []
         is_capturing = True
         status_label.configure(text="Capturing...", text_color="white")
 
@@ -208,20 +228,14 @@ def show_generate_dataset_content(content_area, responsive_manager):
     )
     btn_start.pack(fill="x", padx=20, pady=(0, 15))
 
-    # ---------------- CLEANUP ON TAB SWITCH ----------------
+    # ---------------- CLEANUP ----------------
     def on_cleanup(event=None):
-        # We only care about the destruction of the main_frame itself
         if event and event.widget != main_frame:
             return
-        
-        # Stop capturing if in progress
         nonlocal is_capturing
         is_capturing = False
-        
-        # Close camera to free resources for other tabs
         shared.release_camera_stream()
 
     main_frame.bind("<Destroy>", on_cleanup)
 
-    # Start the video loop
     update_video_loop()

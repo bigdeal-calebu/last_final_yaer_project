@@ -4,7 +4,7 @@ import os
 import shutil
 from PIL import Image
 import re
-from db import add_new_admin
+from db import add_new_admin, get_all_admins
 
 def show_add_admin_content(content_area, responsive_manager):
     """Add new admin users - FULLY IMPLEMENTED"""
@@ -137,4 +137,53 @@ def show_add_admin_content(content_area, responsive_manager):
     # Place submit button at the bottom of the left column to align with text fields
     ctk.CTkButton(left_col, text="➕ REGISTER ADMINISTRATOR", height=50, 
                   font=("Arial", 14, "bold"), fg_color="#2ECC71", hover_color="#27AE60", text_color="black", 
-                  command=handle_add_admin).pack(fill="x", pady=(20, 0))
+                  command=handle_add_admin).pack(fill="x", pady=(20, 10))
+
+    def switch_to_admins_view():
+        # Clear the current content area
+        for widget in content_area.winfo_children():
+            widget.destroy()
+            
+        # Header for the View Admins page
+        header_frame = ctk.CTkFrame(content_area, fg_color="transparent")
+        header_frame.pack(fill="x", padx=40, pady=(30, 10))
+        
+        # Back button
+        def go_back():
+            for widget in content_area.winfo_children():
+                widget.destroy()
+            show_add_admin_content(content_area, responsive_manager)
+
+        ctk.CTkButton(header_frame, text="⬅️ BACK", height=40, width=100,
+                      font=("Arial", 13, "bold"), fg_color="#333", hover_color="#444", 
+                      command=go_back).pack(side="left")
+                      
+        ctk.CTkLabel(header_frame, text="   👥 Registered Administrators", 
+                     font=("Segoe UI", 28, "bold"), text_color="#3498DB").pack(side="left", padx=10)
+                     
+        # Scrollable list container
+        scroll_frame = ctk.CTkScrollableFrame(content_area, fg_color="#121212", corner_radius=15, border_width=1, border_color="#333")
+        scroll_frame.pack(fill="both", expand=True, padx=40, pady=(10, 30))
+        
+        admins = get_all_admins()
+        
+        if not admins:
+            ctk.CTkLabel(scroll_frame, text="No administrators found.", text_color="gray", font=("Arial", 16)).pack(pady=40)
+            return
+            
+        for admin in admins:
+            card = ctk.CTkFrame(scroll_frame, fg_color="#1f1f1f", corner_radius=10)
+            card.pack(fill="x", padx=20, pady=10)
+            
+            name = admin.get('full_name') or admin.get('name') or admin.get('username') or "Admin"
+            email = admin.get('email', 'No Email')
+            
+            info_frame = ctk.CTkFrame(card, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True, padx=20, pady=15)
+            
+            ctk.CTkLabel(info_frame, text=name, font=("Arial", 18, "bold"), text_color="white").pack(anchor="w")
+            ctk.CTkLabel(info_frame, text=email, font=("Arial", 14), text_color="#aaaaaa").pack(anchor="w", pady=(5, 0))
+
+    ctk.CTkButton(left_col, text="👁️ VIEW REGISTERED ADMINS", height=50, 
+                  font=("Arial", 14, "bold"), fg_color="#3498DB", hover_color="#2980B9", text_color="white", 
+                  command=switch_to_admins_view).pack(fill="x")

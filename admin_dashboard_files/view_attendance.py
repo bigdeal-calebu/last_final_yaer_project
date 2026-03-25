@@ -1,10 +1,10 @@
 import customtkinter as ctk
 from PIL import Image
 import os
-import time
 from admin_dashboard_files.shared import present_details_list, present_student_ids, get_connection
 from db import get_attendance_history
 
+# -------------------- Attendance Records --------------------
 def show_attendance_content(content_area, responsive_manager):
     """Displays comprehensive attendance records and analytics from the database."""
     header_frame = ctk.CTkFrame(content_area, fg_color="transparent")
@@ -92,17 +92,74 @@ def show_attendance_content(content_area, responsive_manager):
     update_table()
     search_entry.bind("<KeyRelease>", lambda e: update_table(search_entry.get()))
 
+# -------------------- Present Students --------------------
 def show_present_list_content(content_area, responsive_manager):
     """Displays a list of students currently recognized in this session."""
+    from tkinter import filedialog, messagebox
+    from datetime import datetime
+
     ctk.CTkLabel(content_area, text="✅ Recognized Students (Live)", font=("Segoe UI", 28, "bold"), text_color="#00c853").pack(anchor="w", padx=30, pady=(30, 10))
     summary_bar = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=10)
     summary_bar.pack(fill="x", padx=30, pady=(0, 20))
     ctk.CTkLabel(summary_bar, text=f"Total Recognized: {len(present_details_list)}", font=("Arial", 14, "bold"), text_color="gray").pack(side="left", padx=20, pady=10)
+
+    # -------------------- Export Present --------------------
+    def export_present_excel():
+        if not present_details_list:
+            messagebox.showinfo("Info", "No present students to export.")
+            return
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        except ImportError:
+            messagebox.showerror("Error", "openpyxl is not installed.\nRun: pip install openpyxl")
+            return
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel Files", "*.xlsx")],
+            initialdir=downloads_folder,
+            initialfile=f"Present_Students_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        )
+        if not file_path: return
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Present Students"
+            headers = ["Name", "Reg No", "Course", "Program", "Date", "Time"]
+            header_font = Font(bold=True, color="FFFFFF", size=12)
+            header_fill = PatternFill(start_color="00C853", end_color="00C853", fill_type="solid")
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            for col, h in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=h)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = thin_border
+            for r, item in enumerate(present_details_list, 2):
+                vals = [item['name'], item['reg'], item['course'], item.get('session', item.get('program', 'N/A')), item['date'], item['time']]
+                for c, v in enumerate(vals, 1):
+                    cell = ws.cell(row=r, column=c, value=v)
+                    cell.border = thin_border
+                    cell.alignment = Alignment(horizontal='center')
+            for col in range(1, len(headers) + 1):
+                ws.column_dimensions[chr(64 + col)].width = 22
+            wb.save(file_path)
+            messagebox.showinfo("Success", f"Excel file saved to:\n{file_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export: {e}")
+
+    ctk.CTkButton(summary_bar, text="📥 Download Excel", fg_color="#00c853", hover_color="#00a844",
+                  font=("Arial", 13, "bold"), height=35, width=170, corner_radius=8,
+                  command=export_present_excel).pack(side="right", padx=20, pady=10)
+    
+    # -------------------- Present Table --------------------
     search_frame = ctk.CTkFrame(content_area, fg_color="transparent")
     search_frame.pack(fill="x", padx=30, pady=(0, 10))
     ctk.CTkLabel(search_frame, text="🔍 Search Student:", font=("Arial", 12, "bold"), text_color="gray").pack(side="left")
     search_entry = ctk.CTkEntry(search_frame, placeholder_text="Type Name, Reg No...", width=350, height=35, corner_radius=10)
     search_entry.pack(side="left", padx=15)
+
     table_frame = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=12)
     table_frame.pack(fill="both", expand=True, padx=30, pady=(0, 30))
     header = ctk.CTkFrame(table_frame, fg_color="#0f0f0f", corner_radius=10)
@@ -110,10 +167,9 @@ def show_present_list_content(content_area, responsive_manager):
     cols = ["Name", "Reg No", "Course", "Program", "Date", "Time"]
     for text in cols:
         ctk.CTkLabel(header, text=text, font=("Arial", 12, "bold"), text_color="darkorange").pack(side="left", expand=True, fill="x")
+    
     scroll_table = ctk.CTkScrollableFrame(table_frame, fg_color="transparent")
     scroll_table.pack(fill="both", expand=True, padx=5, pady=(0, 15))
-
-    # Inner container
     scroll_container = ctk.CTkFrame(scroll_table, fg_color="transparent")
     scroll_container.pack(fill="both", expand=True)
 
@@ -132,162 +188,118 @@ def show_present_list_content(content_area, responsive_manager):
             ctk.CTkLabel(row, text=item['name'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
             ctk.CTkLabel(row, text=item['reg'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
             ctk.CTkLabel(row, text=item['course'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=item['program'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
+            ctk.CTkLabel(row, text=item.get('session', item.get('program', 'N/A')), font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
             ctk.CTkLabel(row, text=item['date'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
             ctk.CTkLabel(row, text=item['time'], font=("Arial", 11), text_color="#00c853").pack(side="left", expand=True, fill="x", pady=8)
+
     update_table()
     search_entry.bind("<KeyRelease>", lambda e: update_table(search_entry.get()))
 
+# -------------------- Absent Students --------------------
 def show_absent_list_content(content_area, responsive_manager):
     """Displays a list of students who have not been recognized today."""
-    ctk.CTkLabel(content_area, text="❌ Students Absent (Live)", font=("Segoe UI", 28, "bold"), text_color="#9c27b0").pack(anchor="w", padx=30, pady=(30, 10))
+    from tkinter import filedialog, messagebox
+    from datetime import datetime
+
+    ctk.CTkLabel(content_area, text="\u274c Students Absent (Live)", font=("Segoe UI", 28, "bold"), text_color="#9c27b0").pack(anchor="w", padx=30, pady=(30, 10))
     absent_students = []
     try:
         conn = get_connection()
         if conn:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT name, reg_no, course, program, department FROM students")
+            cursor.execute("SELECT full_name as name, registration_no as reg_no, course, session as program, department FROM students")
             all_students = cursor.fetchall()
             absent_students = [s for s in all_students if s['reg_no'] not in present_student_ids]
             cursor.close()
             conn.close()
     except Exception as e: print(f"Error: {e}")
+
     summary_bar = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=10)
     summary_bar.pack(fill="x", padx=30, pady=(0, 20))
     ctk.CTkLabel(summary_bar, text=f"Total Absent: {len(absent_students)}", font=("Arial", 14, "bold"), text_color="gray").pack(side="left", padx=20, pady=10)
+
+    def export_absent_excel():
+        if not absent_students:
+            messagebox.showinfo("Info", "No absent students to export.")
+            return
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        except ImportError:
+            messagebox.showerror("Error", "openpyxl is not installed.\nRun: pip install openpyxl")
+            return
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel Files", "*.xlsx")],
+            initialdir=downloads_folder,
+            initialfile=f"Absent_Students_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        )
+        if not file_path: return
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Absent Students"
+            headers = ["Name", "Reg No", "Course", "Program", "Department"]
+            header_font = Font(bold=True, color="FFFFFF", size=12)
+            header_fill = PatternFill(start_color="9C27B0", end_color="9C27B0", fill_type="solid")
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            for col, h in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=h)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = thin_border
+            for r, s in enumerate(absent_students, 2):
+                vals = [s['name'], s['reg_no'], s['course'], s['program'], s['department']]
+                for c, v in enumerate(vals, 1):
+                    cell = ws.cell(row=r, column=c, value=v)
+                    cell.border = thin_border
+                    cell.alignment = Alignment(horizontal='center')
+            for col in range(1, len(headers) + 1):
+                ws.column_dimensions[chr(64 + col)].width = 22
+            wb.save(file_path)
+            messagebox.showinfo("Success", f"Excel file saved to:\n{file_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export: {e}")
+
+    ctk.CTkButton(summary_bar, text="📥 Download Excel", fg_color="#9c27b0", hover_color="#7b1fa2",
+                  font=("Arial", 13, "bold"), height=35, width=170, corner_radius=8,
+                  command=export_absent_excel).pack(side="right", padx=20, pady=10)
+
+    # Absent Table
     search_frame = ctk.CTkFrame(content_area, fg_color="transparent")
     search_frame.pack(fill="x", padx=30, pady=(0, 10))
     search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search Absent...", width=350, height=35, corner_radius=10)
-    search_entry.pack(side="left", padx=15)
+    search_entry.pack(side="left", padx=10)
+
     table_frame = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=12)
     table_frame.pack(fill="both", expand=True, padx=30, pady=(0, 30))
     header = ctk.CTkFrame(table_frame, fg_color="#0f0f0f", corner_radius=10)
     header.pack(fill="x", padx=15, pady=15)
     cols = ["Name", "Reg No", "Course", "Program", "Department"]
     for text in cols:
-        ctk.CTkLabel(header, text=text, font=("Arial", 12, "bold"), text_color="darkorange").pack(side="left", expand=True, fill="x")
+        ctk.CTkLabel(header, text=text, font=("Arial", 12, "bold"), text_color="violet").pack(side="left", expand=True, fill="x")
+
     scroll_table = ctk.CTkScrollableFrame(table_frame, fg_color="transparent")
     scroll_table.pack(fill="both", expand=True, padx=5, pady=(0, 15))
-
-    # Inner container
     scroll_container = ctk.CTkFrame(scroll_table, fg_color="transparent")
     scroll_container.pack(fill="both", expand=True)
 
     def update_table(query=""):
         for widget in scroll_container.winfo_children(): widget.destroy()
-        query = query.lower()
-        filtered_list = [s for s in absent_students if query in s['name'].lower() or query in s['reg_no'].lower()]
+        filtered_list = absent_students
+        if query:
+            query = query.lower()
+            filtered_list = [s for s in absent_students if query in s['name'].lower() or query in s['reg_no'].lower()]
+        if not filtered_list:
+            ctk.CTkLabel(scroll_container, text="No matching absent students found.", font=("Arial", 14), text_color="gray").pack(pady=50)
+            return
         for s in filtered_list:
             row = ctk.CTkFrame(scroll_container, fg_color="#2c2c2c", corner_radius=8)
             row.pack(fill="x", padx=10, pady=4)
-            ctk.CTkLabel(row, text=s['name'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['reg_no'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['course'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['program'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['department'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
+            for key in ['name', 'reg_no', 'course', 'program', 'department']:
+                ctk.CTkLabel(row, text=s[key], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
+
     update_table()
     search_entry.bind("<KeyRelease>", lambda e: update_table(search_entry.get()))
-
-def show_all_students_list_content(content_area, responsive_manager):
-    """Displays a list of all registered students in the system."""
-    ctk.CTkLabel(content_area, text="👥 Registered Student Directory", font=("Segoe UI", 28, "bold"), text_color="darkorange").pack(anchor="w", padx=30, pady=(30, 10))
-    all_students = []
-    try:
-        conn = get_connection()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT name, reg_no, course, program, department FROM students")
-            all_students = cursor.fetchall()
-            cursor.close()
-            conn.close()
-    except Exception as e: print(f"Error: {e}")
-    summary_bar = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=10)
-    summary_bar.pack(fill="x", padx=30, pady=(0, 20))
-    ctk.CTkLabel(summary_bar, text=f"Total Registered: {len(all_students)}", font=("Arial", 14, "bold"), text_color="gray").pack(side="left", padx=20, pady=10)
-    search_frame = ctk.CTkFrame(content_area, fg_color="transparent")
-    search_frame.pack(fill="x", padx=30, pady=(0, 10))
-    search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search Students...", width=350, height=35, corner_radius=10)
-    search_entry.pack(side="left", padx=15)
-    table_frame = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=12)
-    table_frame.pack(fill="both", expand=True, padx=30, pady=(0, 30))
-    header = ctk.CTkFrame(table_frame, fg_color="#0f0f0f", corner_radius=10)
-    header.pack(fill="x", padx=15, pady=15)
-    cols = ["Name", "Reg No", "Course", "Program", "Department"]
-    for text in cols:
-        ctk.CTkLabel(header, text=text, font=("Arial", 12, "bold"), text_color="white").pack(side="left", expand=True, fill="x")
-    scroll_table = ctk.CTkScrollableFrame(table_frame, fg_color="transparent")
-    scroll_table.pack(fill="both", expand=True, padx=5, pady=(0, 15))
-
-    # Inner container
-    scroll_container = ctk.CTkFrame(scroll_table, fg_color="transparent")
-    scroll_container.pack(fill="both", expand=True)
-
-    def update_table(query=""):
-        for widget in scroll_container.winfo_children(): widget.destroy()
-        query = query.lower()
-        filtered_list = [s for s in all_students if query in s['name'].lower() or query in s['reg_no'].lower()]
-        for s in filtered_list:
-            row = ctk.CTkFrame(scroll_container, fg_color="#2c2c2c", corner_radius=8)
-            row.pack(fill="x", padx=10, pady=4)
-            ctk.CTkLabel(row, text=s['name'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['reg_no'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['course'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['program'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-            ctk.CTkLabel(row, text=s['department'], font=("Arial", 11)).pack(side="left", expand=True, fill="x", pady=8)
-    update_table()
-    search_entry.bind("<KeyRelease>", lambda e: update_table(search_entry.get()))
-
-def show_unknowns_list_content(content_area, responsive_manager, show_content_callback=None):
-    """Displays a list of automatically captured unknown individuals."""
-    ctk.CTkLabel(content_area, text="🕵️ Captured Unknowns", font=("Segoe UI", 28, "bold"), text_color="#ff5722").pack(anchor="w", padx=30, pady=(30, 10))
-    base_dir = "unknowns"
-    unknown_folders = []
-    if os.path.exists(base_dir):
-        folders = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
-        folders.sort(key=lambda x: os.path.getctime(os.path.join(base_dir, x)), reverse=True)
-        for d in folders:
-            folder_path = os.path.join(base_dir, d)
-            img_count = len([f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
-            created_at = time.ctime(os.path.getctime(folder_path))
-            unknown_folders.append({'id': d, 'count': img_count, 'time': created_at, 'path': folder_path})
-    summary_bar = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=10)
-    summary_bar.pack(fill="x", padx=30, pady=(0, 20))
-    ctk.CTkLabel(summary_bar, text=f"Total Unknown Sessions: {len(unknown_folders)}", font=("Arial", 14, "bold"), text_color="gray").pack(side="left", padx=20, pady=10)
-    table_frame = ctk.CTkFrame(content_area, fg_color="#1a1a1a", corner_radius=12)
-    table_frame.pack(fill="both", expand=True, padx=30, pady=(0, 30))
-    header = ctk.CTkFrame(table_frame, fg_color="#0f0f0f", corner_radius=10)
-    header.pack(fill="x", padx=15, pady=15)
-    cols = ["Capture ID", "Images Captured", "Time Detected", "Action"]
-    for text in cols:
-        ctk.CTkLabel(header, text=text, font=("Arial", 12, "bold"), text_color="white").pack(side="left", expand=True, fill="x")
-    scroll_table = ctk.CTkScrollableFrame(table_frame, fg_color="transparent")
-    scroll_table.pack(fill="both", expand=True, padx=5, pady=(0, 15))
-    for session in unknown_folders:
-        row = ctk.CTkFrame(scroll_table, fg_color="#2c2c2c", corner_radius=8)
-        row.pack(fill="x", padx=10, pady=4)
-        ctk.CTkLabel(row, text=session['id'], text_color="#ff5722", font=("Arial", 12, "bold")).pack(side="left", expand=True, fill="x", pady=10)
-        ctk.CTkLabel(row, text=f"{session['count']} frames").pack(side="left", expand=True, fill="x", pady=10)
-        ctk.CTkLabel(row, text=session['time']).pack(side="left", expand=True, fill="x", pady=10)
-        def view_images(p=session['path'], sid=session['id']):
-            if show_content_callback:
-                show_content_callback(lambda a, r: show_unknown_session_images(a, r, sid, p, show_content_callback=show_content_callback))
-        ctk.CTkButton(row, text="🖼️ View Images", command=view_images, fg_color="#ff5722", hover_color="#e64a19", height=28, width=100).pack(side="right", padx=10)
-
-def show_unknown_session_images(area, rm, session_id, folder_path, show_content_callback=None):
-    """Gallery of images for an unknown session."""
-    header = ctk.CTkFrame(area, fg_color="transparent")
-    header.pack(fill="x", padx=30, pady=(30, 10))
-    ctk.CTkButton(header, text="← Back", command=lambda: show_content_callback(lambda a, r: show_unknowns_list_content(a, r, show_content_callback=show_content_callback)) if show_content_callback else None).pack(side="left")
-    ctk.CTkLabel(header, text=f"📂 Session: {session_id}", font=("Segoe UI", 24, "bold"), text_color="#ff5722").pack(side="left", padx=20)
-    scroll = ctk.CTkScrollableFrame(area, fg_color="#1a1a1a", corner_radius=15)
-    scroll.pack(fill="both", expand=True, padx=30, pady=10)
-    if os.path.exists(folder_path):
-        images = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-        images.sort()
-        for img_name in images:
-            try:
-                pil_img = Image.open(os.path.join(folder_path, img_name))
-                pil_img.thumbnail((200, 200))
-                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(180, 150))
-                ctk.CTkLabel(scroll, text="", image=ctk_img).pack(side="left", padx=10, pady=10)
-            except: pass

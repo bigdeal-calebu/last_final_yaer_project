@@ -151,6 +151,25 @@ def add_new_admin(full_name, email, password, image_path=None):
         conn.close()
 # END add_new_admin
 
+# ------------------------------------------------------------------
+# get_all_admins()
+# PURPOSE : Retrieve all administrators from the database.
+# RETURNS : List of admin dictionaries or an empty list.
+# ------------------------------------------------------------------
+def get_all_admins():
+    conn = get_connection()
+    if conn is None: return []
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, full_name, email FROM admin")
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching admins: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+# END get_all_admins
 
 # =================== HELPERS ===================
 # ------------------------------------------------------------------

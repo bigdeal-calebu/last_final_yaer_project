@@ -6,5 +6,6 @@
     "capture_unknowns": true,
     "unknown_frames_to_capture": 15,
     "late_arrival_time": "08:30:00",
-    "appearance_mode": "Dark"
+    "appearance_mode": "Dark",
+    "last_archive_date": "2026-03-28"
 }

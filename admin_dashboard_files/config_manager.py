@@ -19,7 +19,10 @@ DEFAULT_CONFIG = {
     "late_arrival_time": "08:30:00",
     
     # UI Preference
-    "appearance_mode": "Dark"
+    "appearance_mode": "Dark",
+    
+    # Archiver
+    "last_archive_date": ""
 }
 
 _current_config = None
@@ -55,8 +58,12 @@ def set_val(key, value):
     """Set a single config value in memory."""
     if _current_config is None:
         load_config()
-    if key in _current_config:
-        _current_config[key] = value
+    _current_config[key] = value
+
+def set(key, value):
+    """Set a single config value and persist to file."""
+    set_val(key, value)
+    save_config()
 
 def save_config():
     """Persist the current in-memory config dict down to the JSON file."""

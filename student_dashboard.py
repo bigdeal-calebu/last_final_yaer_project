@@ -210,11 +210,24 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
         stats_frame.pack(fill="x", pady=(0, 20))
         stats_frame.columnconfigure((0,1,2,3), weight=1)
         
+        from db import get_student_attendance_stats
+        real_stats = get_student_attendance_stats(reg_no, course)
+        if real_stats:
+            attended_str = f"{real_stats['Classes Attended']} days"
+            absent_str = f"{real_stats['Classes Missed']} days"
+            late_str = f"{real_stats['Late Count']} times"
+            today_status, today_color = real_stats['Today’s Attendance Status']
+        else:
+            attended_str = "0 days"
+            absent_str = "0 days"
+            late_str = "0 times"
+            today_status, today_color = "Unknown", "gray"
+        
         stats_data_items = [
-            ("Total Present", "45 days", "#2ECC71", "✅"),
-            ("Absent Days", "2 days", "#e74c3c", "❌"),
-            ("Late Arrivals", "3 times", "#F39C12", "⏰"),
-            ("Today's Status", "Present", "#3498db", "📍")
+            ("Total Present", attended_str, "#2ECC71", "✅"),
+            ("Absent Days", absent_str, "#e74c3c", "❌"),
+            ("Late Arrivals", late_str, "#F39C12", "⏰"),
+            ("Today's Status", today_status, today_color, "📍")
         ]
         
         for i, (label, value, color, icon) in enumerate(stats_data_items):

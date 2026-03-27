@@ -12,6 +12,16 @@ def main():
     # 0. Initialize Database (once at startup)
     db.initialize_database()
     
+    # Preload heavy ML and GUI modules in the background to make login instant
+    import threading
+    def preload_dashboards():
+        try:
+            import student_dashboard
+            import admin_dashboard
+        except Exception as e:
+            pass
+    threading.Thread(target=preload_dashboards, daemon=True).start()
+    
     ctk.set_appearance_mode("Dark")
     root = ctk.CTk()
     root.title("Smart Attendance System")
@@ -75,6 +85,10 @@ def main():
 
     def on_admin_success(data): 
         print("Admin Logged In:", data)
+        
+        # Immediate sync for dashboard to prevent screen flicker/reloads
+        from admin_dashboard_files import shared
+        shared.refresh_global_stats()
         def _rebuild():
             clear_screen()
             import admin_dashboard

@@ -72,7 +72,7 @@ def create_admin_dashboard(parent_frame, on_logout_click, admin_data=None):
             ("📸 Generate Dataset", lambda: show_content(generate_dataset.show_generate_dataset_content)),
             ("🧠 Train Classifier", lambda: show_content(train_classifier.show_train_classifier_content)),
             ("🔍 Face Recognition", lambda: show_content(face_recognition.show_face_recognition_content)),
-            ("📋 View Attendance", lambda: show_content(view_attendance.show_attendance_content)),
+            ("📊 Attendance History", lambda: show_content(view_attendance.show_attendance_history_content)),
         ],
         "STUDENTS": [
             ("➕ Register Student", lambda: show_content(lambda area, rm: admin_register_student.show_register_student_content(area, rm))),

@@ -31,85 +31,44 @@ from admin_dashboard_files.shared import (
 )
 
 # ---------------- Recognition Globals ----------------
-CLASSIFIER_PATH = os.path.join(parent_dir, "classifier.xml")
-LABEL_MAP_PATH  = os.path.join(parent_dir, "models", "label_map.json")
+CLASSIFIER_PATH = os.path.join(parent_dir, "models", "embeddings.pkl")
 
-# Haar cascades
-face_xml = os.path.join(parent_dir, "cascade/haarcascade_frontalface_default.xml")
-if not os.path.exists(face_xml):
-    face_xml = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-face_cascade = cv2.CascadeClassifier(face_xml)
-eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+# OpenCV YuNet Face Detector
+yunet_path = os.path.join(parent_dir, "dnn_model", "face_detection_yunet.onnx")
+try:
+    yunet = cv2.FaceDetectorYN.create(yunet_path, "", (320, 320))
+except Exception as e:
+    print(f"Error loading YuNet model: {e}")
+    yunet = None
 
-recognizer = cv2.face.LBPHFaceRecognizer_create()
+# OpenCV SFace (Deep Learning Embeddings)
+sface_path = os.path.join(parent_dir, "dnn_model", "face_recognition_sface.onnx")
+try:
+    sface = cv2.FaceRecognizerSF.create(sface_path, "")
+except Exception as e:
+    print(f"Error loading SFace model: {e}")
+    sface = None
+
 model_loaded = False
-label_map = {}
-
-# --- Unknown Capture Tracking ---
-import time
-UNKNOWN_SESSION_ID = None
-UNKNOWN_CAPTURE_COUNT = 0
-LAST_UNKNOWN_SEEN_TIME = 0
-LAST_CAPTURE_TIME = 0
-
-def handle_unknown_capture(frame, x, y, w, h):
-    global UNKNOWN_SESSION_ID, UNKNOWN_CAPTURE_COUNT, LAST_UNKNOWN_SEEN_TIME, LAST_CAPTURE_TIME
-    
-    current_time = time.time()
-    
-    # If it's been more than 5 seconds since the last unknown face, start a new session
-    if current_time - LAST_UNKNOWN_SEEN_TIME > 5:
-        UNKNOWN_SESSION_ID = "unk_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-        UNKNOWN_CAPTURE_COUNT = 0
-        LAST_CAPTURE_TIME = 0
-        
-    LAST_UNKNOWN_SEEN_TIME = current_time
-    
-    # Capture up to 5 images, maximum 1 image every 0.6 seconds
-    if UNKNOWN_CAPTURE_COUNT < 5 and (current_time - LAST_CAPTURE_TIME > 0.6):
-        try:
-            unknown_dir = os.path.join(parent_dir, "unknowns", UNKNOWN_SESSION_ID)
-            os.makedirs(unknown_dir, exist_ok=True)
-            
-            # Save the cropped face with a little padding
-            pad = 30
-            y1 = max(0, y - pad)
-            y2 = min(frame.shape[0], y + h + pad)
-            x1 = max(0, x - pad)
-            x2 = min(frame.shape[1], x + w + pad)
-            
-            face_img = frame[y1:y2, x1:x2]
-            
-            if face_img.size > 0:
-                img_path = os.path.join(unknown_dir, f"capture_{UNKNOWN_CAPTURE_COUNT+1}.jpg")
-                cv2.imwrite(img_path, face_img)
-                UNKNOWN_CAPTURE_COUNT += 1
-                LAST_CAPTURE_TIME = current_time
-        except Exception as e:
-            print(f"Failed to save unknown image: {e}")
+embeddings_db = {}
 
 # ---------------- Utility Functions ----------------
-def load_label_map():
-    global label_map
-    try:
-        if os.path.exists(LABEL_MAP_PATH):
-            with open(LABEL_MAP_PATH, "r") as f:
-                label_map = json.load(f)
-    except:
-        label_map = {}
-
 def reload_classifier():
-    global recognizer, model_loaded
+    global embeddings_db, model_loaded
+    import pickle
     try:
         if os.path.exists(CLASSIFIER_PATH):
-            recognizer.read(CLASSIFIER_PATH)
-            model_loaded = True
+            with open(CLASSIFIER_PATH, "rb") as f:
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=DeprecationWarning)
+                    embeddings_db = pickle.load(f)
+            model_loaded = True if len(embeddings_db) > 0 else False
             return True
     except:
         pass
     return False
 
-load_label_map()
 reload_classifier()
 
 # Cache for student details
@@ -129,36 +88,7 @@ def get_cached_student(sid):
         return info
     return None
 
-# Enhance grayscale image (Consistent with training)
-def enhance_face(img_gray):
-    denoised = cv2.GaussianBlur(img_gray, (3, 3), 0)
-    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-    clahe_img = clahe.apply(denoised)
-    norm = cv2.equalizeHist(clahe_img)
-    blur = cv2.GaussianBlur(norm, (0, 0), 1)
-    sharp = cv2.addWeighted(norm, 1.2, blur, -0.2, 0)
-    return sharp
-
-# Align face using eyes (optional)
-def align_face(img_gray, face_box):
-    x, y, w, h = face_box
-    roi_gray = img_gray[y:y+h, x:x+w]
-    eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.3, minNeighbors=8, minSize=(30, 30))
-    
-    if len(eyes) >= 2:
-        eyes = sorted(eyes, key=lambda e: e[0])
-        lex, ley, lw, lh = eyes[0]
-        rex, rey, rw, rh = eyes[-1]
-        l_center = (x + lex + lw//2, y + ley + lh//2)
-        r_center = (x + rex + rw//2, y + rey + rh//2)
-        dy = r_center[1] - l_center[1]
-        dx = r_center[0] - l_center[0]
-        angle = float(np.degrees(np.arctan2(dy, dx)))
-        center = (float((l_center[0] + r_center[0]) / 2), float((l_center[1] + r_center[1]) / 2))
-        M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        aligned = cv2.warpAffine(img_gray, M, (img_gray.shape[1], img_gray.shape[0]), flags=cv2.INTER_LINEAR)
-        return aligned, (l_center, r_center)
-    return img_gray, None
+# Dummy DB functions if not available
 
 # Draw label on frame
 def draw_label(img, text, org, font, scale, txt_color, bg_color, thickness=1):
@@ -180,97 +110,128 @@ def get_recognition_frame():
     if not ret:
         return None, []
 
+    h_img, w_img = frame.shape[:2]
     gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = []
     
-    # Increased minNeighbors (from 6 to 9) to heavily penalize false positives.
-    # Increased minSize (from 60 to 80) to ignore small background textures.
-    faces = face_cascade.detectMultiScale(gray_full, scaleFactor=1.3, minNeighbors=6, minSize=(40, 40))
+    if yunet is not None:
+        yunet.setInputSize((w_img, h_img))
+        _, yunet_faces = yunet.detect(frame)
+        
+        if yunet_faces is not None:
+            for face_data in yunet_faces:
+                box = face_data[0:4].astype("int")
+                (startX, startY, w, h) = box
+                
+                startX = max(0, startX)
+                startY = max(0, startY)
+                endX = min(w_img - 1, startX + w)
+                endY = min(h_img - 1, startY + h)
+                
+                w = endX - startX
+                h = endY - startY
+                
+                if w > 40 and h > 40:
+                    faces.append((startX, startY, w, h, face_data))
+
     print("Faces detected:", len(faces))
     detections = []
 
-    for (x, y, w, h) in faces:
+    for (x, y, w, h, face_data_arr) in faces:
         name, reg_no, course, session = "Unknown", "", "", ""
         box_color, bg_color = (0, 0, 255), (0, 0, 200) # Red for Unknown
         font_scale = max(0.45, min(0.7, w/150.0)) # Slightly larger text for readability
         
-        aligned_gray, eye_points = align_face(gray_full, (x, y, w, h))
-
-        if model_loaded:
+        if model_loaded and sface is not None:
             try:
-                # Crop exact face box
-                face_roi = aligned_gray[y:y+h, x:x+w]
+                # SFace physically aligns the face using the 5 YuNet landmarks for 100% precision
+                aligned_crop = sface.alignCrop(frame, face_data_arr)
 
-                if face_roi.size > 0:
-                    roi_resize = cv2.resize(face_roi, (100, 100))  # Match training
-                    roi_r = enhance_face(roi_resize)
-
-                    lbl, conf = recognizer.predict(roi_r)
+                if aligned_crop is not None:
+                    # Extract live 128D feature directly from the aligned crop
+                    live_feature = sface.feature(aligned_crop)
                     
-                    # LOWER threshold means STRICTER AI. 
-                    # 105 ensures that loose matches are rejected and marked as "Unknown".
-                    confidence_threshold = 85
-                    if conf < confidence_threshold:
-                        sid = label_map.get(str(lbl), "Unknown")
-                        if sid != "Unknown":
-                            student_info = get_cached_student(sid)
-                            if student_info:
-                                name = student_info["full_name"]
-                                course = student_info["course"]
-                                session = student_info["session"]
-                                dept = student_info["department"]
-                                box_color = (0, 255, 0) # Green for recognized
-                                bg_color = (0, 180, 0) # Darker Green BG for name
-                                reg_no = sid
+                    best_match = "Unknown"
+                    best_score = -1.0
+                    
+                    # Compute Cosine Similarity distance against all registered students
+                    for sid, db_feature in embeddings_db.items():
+                        try:
+                            # Verify shapes beforehand to avoid crash
+                            if getattr(db_feature, 'size', 0) != 128:
+                                print(f"Invalid DB feature size for {sid}: {getattr(db_feature, 'size', 'unknown')}")
+                                continue
+                            
+                            db_feat = np.ascontiguousarray(db_feature, dtype=np.float32).reshape(1, 128)
+                            live_feat = np.ascontiguousarray(live_feature, dtype=np.float32).reshape(1, 128)
+                            
+                            score = sface.match(live_feat, db_feat, cv2.FaceRecognizerSF_FR_COSINE)
+                            if score > best_score:
+                                best_score = score
+                                best_match = sid
+                        except Exception as loop_e:
+                            print(f"Match error for {sid}: {loop_e}")
+                    
+                    # threshold for SFace cosine similarity is ~0.363 for true positive exactly
+                    # We use 0.36 to be safe but strict
+                    confidence_threshold = 0.36
+                    
+                    # For GUI display, map it to a percentage
+                    conf_display = int(max(0, min(100, best_score * 100)))
 
-                                # Mark attendance once
-                                if sid not in shared.present_student_ids:
-                                    shared.present_student_ids.add(sid)
-                                    now = datetime.now()
-                                    shared.present_details_list.append({
-                                        'name': name,
-                                        'reg': sid,
-                                        'course': course,
-                                        'session': session,
-                                        'date': now.strftime("%Y-%m-%d"),
-                                        'time': now.strftime("%H:%M:%S")
-                                    })
+                    if best_score >= confidence_threshold and best_match != "Unknown":
+                        sid = best_match
+                        student_info = get_cached_student(sid)
+                        if student_info:
+                            name = student_info["full_name"]
+                            course = student_info["course"]
+                            session = student_info["session"]
+                            dept = student_info["department"]
+                            box_color = (0, 255, 0) # Green for recognized
+                            bg_color = (0, 180, 0) # Darker Green BG for name
+                            reg_no = sid
 
-                                    threading.Thread(target=record_attendance, kwargs={
-                                        'reg_no': sid,
-                                        'name': name,
-                                        'course': course,
-                                        'program': session,
-                                        'department': dept,
-                                        'status': "Present"
-                                    }, daemon=True).start()
-
-                                    if shared.sidebar_stats_callback:
-                                        shared.sidebar_stats_callback()
-
-                                detections.append({
-                                    "reg_no": sid,
-                                    "name": name,
-                                    "course": course,
-                                    "session": session
+                            # Mark attendance once
+                            if sid not in shared.present_student_ids:
+                                shared.present_student_ids.add(sid)
+                                now = datetime.now()
+                                shared.present_details_list.append({
+                                    'name': name,
+                                    'reg': sid,
+                                    'course': course,
+                                    'session': session,
+                                    'date': now.strftime("%Y-%m-%d"),
+                                    'time': now.strftime("%H:%M:%S")
                                 })
-                            else:
-                                # Not in the database system at all
-                                name = "Unknown"
-                                box_color = (0, 0, 255)
-                                bg_color = (0, 0, 200)
-                                handle_unknown_capture(frame, x, y, w, h)
+
+                                threading.Thread(target=record_attendance, kwargs={
+                                    'reg_no': sid,
+                                    'name': name,
+                                    'course': course,
+                                    'program': session,
+                                    'department': dept,
+                                    'status': "Present"
+                                }, daemon=True).start()
+
+                                if shared.sidebar_stats_callback:
+                                    shared.sidebar_stats_callback()
+
+                            detections.append({
+                                "reg_no": sid,
+                                "name": name,
+                                "course": course,
+                                "session": session
+                            })
                         else:
-                            # Not in label map
+                            # Not in the database system at all
                             name = "Unknown"
                             box_color = (0, 0, 255)
                             bg_color = (0, 0, 200)
-                            handle_unknown_capture(frame, x, y, w, h)
                     else:
                         # Confidence too low
                         name = "Unknown"
                         box_color = (0, 0, 255)
                         bg_color = (0, 0, 200)
-                        handle_unknown_capture(frame, x, y, w, h)
 
             except Exception as e:
                 print(f"Recognition Error: {e}")
@@ -310,8 +271,10 @@ def get_recognition_frame():
 
 # ---------------- GUI ----------------
 def show_face_recognition_content(content_area, responsive_manager):
+    for widget in content_area.winfo_children():
+        widget.destroy()
+        
     # Ensure the model is loaded every time the tab is opened
-    load_label_map()
     reload_classifier()
     
     ctk.CTkLabel(content_area, text="Face Recognition", font=("Segoe UI",28,"bold"), text_color="#3b9dd8").pack(anchor="w", padx=30, pady=(30,10))
@@ -400,55 +363,64 @@ def train_all_students_bg(progress_callback, status_callback, done_callback, err
             error_callback("No student data (.npy) found in train_images.")
             return
 
-        faces, ids = [], []
-        new_label_map = {}
+        import pickle
+        new_db = {}
         total_students = len(student_files)
         total_images_processed = 0
+        
+        # Load local SFace to prevent threading conflicts
+        sface_bg = cv2.FaceRecognizerSF.create(os.path.join(parent_dir, "dnn_model", "face_recognition_sface.onnx"), "")
 
         for idx, filename in enumerate(student_files):
             student_id = filename[:-4] # Remove .npy
-            status_callback(f"Training student {idx+1}/{total_students}: {student_id}")
+            status_callback(f"Extracting 128D Embeddings {idx+1}/{total_students}: {student_id}")
             file_path = os.path.join(data_dir_base, filename)
-            
-            numeric_label = abs(hash(student_id)) % 100000
-            new_label_map[str(numeric_label)] = student_id
             
             try:
                 data = np.load(file_path)
                 num_imgs = len(data)
+                embs = []
                 for i, row in enumerate(data):
                     try:
-                        # Reshape back to 100x100 grayscale
-                        img_np = row.reshape((100, 100)).astype("uint8")
-                        # Apply same enhancement as recognition
-                        processed_face = enhance_face(img_np)
-                        faces.append(processed_face)
-                        ids.append(numeric_label)
+                        # Reshape 112x112 color
+                        img_np = row.reshape((112, 112, 3)).astype("uint8")
+                        feature = sface_bg.feature(img_np)
+                        embs.append(feature[0])
                         total_images_processed += 1
+                    except ValueError:
+                        # Fallback for old grayscale models
+                        try:
+                            img_np = row.reshape((100, 100)).astype("uint8")
+                            color = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+                            res = cv2.resize(color, (112, 112))
+                            feature = sface_bg.feature(res)
+                            embs.append(feature[0])
+                            total_images_processed += 1
+                        except:
+                            continue
                     except:
                         continue
                     if i % 10 == 0 or i == num_imgs - 1:
                         current_p = (idx / total_students) + ((i + 1) / num_imgs / total_students)
-                        progress_callback(current_p, f"Processed {total_images_processed} images...")
+                        progress_callback(current_p, f"Processed {total_images_processed} features...")
+                
+                if embs:
+                    master_emb = np.mean(embs, axis=0)
+                    new_db[student_id] = master_emb
             except Exception as e:
                 print(f"Error loading {filename}: {e}")
                 continue
 
-        if not faces:
-            error_callback("No valid data found to train.")
+        if not new_db:
+            error_callback("No valid embeddings extracted.")
             return
 
-        status_callback("Saving combined model...")
-        clf = cv2.face.LBPHFaceRecognizer_create()
-        clf.train(faces, np.array(ids))
-        clf.save(CLASSIFIER_PATH)
-        
-        os.makedirs(os.path.dirname(LABEL_MAP_PATH), exist_ok=True)
-        with open(LABEL_MAP_PATH, "w") as f:
-            json.dump(new_label_map, f, indent=2)
+        status_callback("Saving Embedding Database...")
+        os.makedirs(os.path.dirname(CLASSIFIER_PATH), exist_ok=True)
+        with open(CLASSIFIER_PATH, "wb") as f:
+            pickle.dump(new_db, f)
             
         reload_classifier()
-        load_label_map()
         done_callback(total_students, total_images_processed)
     except Exception as e:
         error_callback(str(e))

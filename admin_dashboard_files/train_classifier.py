@@ -7,9 +7,11 @@ import threading
 import json
 import numpy as np
 from admin_dashboard_files.shared import start_camera_stream as _scs # not used but for safety
-from admin_dashboard_files.face_recognition import LABEL_MAP_PATH, reload_classifier, load_label_map, train_all_students_bg
+from admin_dashboard_files.face_recognition import reload_classifier, train_all_students_bg
 
 def show_train_classifier_content(content_area, responsive_manager):
+    for widget in content_area.winfo_children():
+        widget.destroy()
 
     ctk.CTkLabel(content_area, text="Train Classifier", font=("Segoe UI", 28, "bold"),
                  text_color="#3498DB").pack(anchor="w", padx=30, pady=(30, 20))
@@ -66,6 +68,7 @@ def show_train_classifier_content(content_area, responsive_manager):
 
     # ---------------- TRAINING THREAD ----------------
     def run_training_thread(student_id, file_path):
+        import pickle
         try:
             data = np.load(file_path)
             total_samples = len(data)
@@ -76,43 +79,61 @@ def show_train_classifier_content(content_area, responsive_manager):
                 content_area.after(0, lambda: reset_ui("Error: No data found"))
                 return
 
-            faces, ids = [], []
+            try:
+                recognizer = cv2.FaceRecognizerSF.create("dnn_model/face_recognition_sface.onnx", "")
+            except Exception as e:
+                content_area.after(0, lambda: reset_ui(f"Error loading SFace model: {e}"))
+                return
+
             numeric_label = abs(hash(student_id)) % 100000
+            embeddings = []
 
             for i, row in enumerate(data):
                 try:
-                    img_np = row.reshape((100, 100)).astype("uint8")
-                    faces.append(img_np)
-                    ids.append(numeric_label)
-                except:
+                    # New format: BGR 112x112
+                    img_np = row.reshape((112, 112, 3)).astype("uint8")
+                    feature = recognizer.feature(img_np)
+                    embeddings.append(feature[0])
+                except ValueError:
+                    # Fallback for old 100x100 grayscale datasets
+                    try:
+                        img_np = row.reshape((100, 100)).astype("uint8")
+                        img_colored = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+                        img_resized = cv2.resize(img_colored, (112, 112))
+                        feature = recognizer.feature(img_resized)
+                        embeddings.append(feature[0])
+                    except:
+                        continue
+                except Exception:
                     continue
 
                 if i % 10 == 0 or i == total_samples - 1:
                     prog_val = (i + 1) / total_samples
                     content_area.after(0, lambda v=prog_val: progress.set(v))
                     content_area.after(0, lambda v=i + 1, t=total_samples:
-                        info_label.configure(text=f"Processing {v}/{t}"))
+                        info_label.configure(text=f"Extracting 128D Features: {v}/{t}"))
 
-            clf = cv2.face.LBPHFaceRecognizer_create()
-            clf.train(faces, np.array(ids))
+            if not embeddings:
+                content_area.after(0, lambda: reset_ui("Error: Could not extract features."))
+                return
+
+            # Construct Master Embedding
+            master_embedding = np.mean(embeddings, axis=0)
 
             os.makedirs("models", exist_ok=True)
-            clf.save("classifier.xml")
-            clf.save(os.path.join("models", f"{student_id}.xml"))
-
-            existing_map = {}
-            if os.path.exists(LABEL_MAP_PATH):
-                with open(LABEL_MAP_PATH, "r") as f:
-                    existing_map = json.load(f)
-
-            existing_map[str(numeric_label)] = student_id
-
-            with open(LABEL_MAP_PATH, "w") as f:
-                json.dump(existing_map, f, indent=2)
+            db_path = "models/embeddings.pkl"
+            db = {}
+            if os.path.exists(db_path):
+                with open(db_path, "rb") as f:
+                    db = pickle.load(f)
+            
+            db[student_id] = master_embedding
+            
+            with open(db_path, "wb") as f:
+                pickle.dump(db, f)
 
             content_area.after(0, lambda: finish_ui(student_id, total_samples))
             reload_classifier()
-            load_label_map()
 
         except Exception as e:
             content_area.after(0, lambda: reset_ui(f"Error: {e}"))
@@ -218,30 +239,19 @@ def show_train_classifier_content(content_area, responsive_manager):
             os.remove(path)
             deleted = True
 
-        # delete model
-        model_path = os.path.join("models", f"{student_id}.xml")
-        if os.path.exists(model_path):
-            os.remove(model_path)
-            deleted = True
+        import pickle
+        db_path = "models/embeddings.pkl"
+        if os.path.exists(db_path):
+            with open(db_path, "rb") as f:
+                db = pickle.load(f)
+            if student_id in db:
+                del db[student_id]
+                deleted = True
+                with open(db_path, "wb") as f:
+                    pickle.dump(db, f)
 
         # remove from label map
-        if os.path.exists(LABEL_MAP_PATH):
-            with open(LABEL_MAP_PATH, "r") as f:
-                data = json.load(f)
-
-            data = {k: v for k, v in data.items() if v != student_id}
-
-            with open(LABEL_MAP_PATH, "w") as f:
-                json.dump(data, f, indent=2)
-
-            deleted = True
-
-        # remove classifier (IMPORTANT)
-        if os.path.exists("classifier.xml"):
-            os.remove("classifier.xml")
-
         reload_classifier()
-        load_label_map()
 
         if deleted:
             delete_status.configure(text="Deleted successfully. Retrain required.",
@@ -250,7 +260,54 @@ def show_train_classifier_content(content_area, responsive_manager):
             delete_status.configure(text="No data found",
                                     text_color="#E74C3C")
 
-    delete_btn = ctk.CTkButton(delete_card, text="🗑 DELETE STUDENT",
+    delete_btn = ctk.CTkButton(delete_card, text="🗑 DELETE INDIVIDUAL STUDENT",
                                command=delete_student_data,
                                fg_color="#E74C3C")
     delete_btn.pack(pady=10)
+
+    def delete_all_students_data():
+        confirm = messagebox.askyesno("WARNING", 
+            "CRITICAL ACTION: Are you sure you want to delete ALL trained student data? This cannot be undone.", 
+            icon="warning")
+        if not confirm:
+            return
+            
+        deleted_count = 0
+        
+        # Delete all .npy files in train_images
+        if os.path.exists("train_images"):
+            for f in os.listdir("train_images"):
+                if f.endswith(".npy"):
+                    os.remove(os.path.join("train_images", f))
+                    deleted_count += 1
+                    
+        # Delete embeddings database
+        if os.path.exists("models/embeddings.pkl"):
+            os.remove("models/embeddings.pkl")
+            
+        # Delete old XML files
+        if os.path.exists("models"):
+            for f in os.listdir("models"):
+                if f.endswith(".xml"):
+                    os.remove(os.path.join("models", f))
+                    
+        # Clear legacy label map
+        label_map_file = "models/label_map.json"
+        if os.path.exists(label_map_file):
+            os.remove(label_map_file)
+                
+        # Remove primary old classifier
+        if os.path.exists("classifier.xml"):
+            os.remove("classifier.xml")
+            
+        reload_classifier()
+        
+        if deleted_count > 0:
+            delete_status.configure(text=f"Wiped {deleted_count} student records completely.", text_color="#2ECC71")
+        else:
+            delete_status.configure(text="No trained data found.", text_color="gray")
+
+    delete_all_btn = ctk.CTkButton(delete_card, text="⚠️ DELETE ALL STUDENTS",
+                               command=delete_all_students_data,
+                               fg_color="#8E44AD", hover_color="#732D91")
+    delete_all_btn.pack(pady=(5, 15))

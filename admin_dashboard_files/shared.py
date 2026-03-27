@@ -138,8 +138,65 @@ def switch_camera_live(index):
 current_camera_index = config_manager.get("camera_index") or 0
 
 # =============================================================================
-# ATTENDANCE STATE
+# ATTENDANCE STATE (GLOBAL CACHE)
 # =============================================================================
 present_student_ids = set()
 present_details_list = []
+all_students_cache = []      # List of all registered students
+total_students_count = 0     # Total count of registered students
 sidebar_stats_callback = None
+
+def sync_attendance_from_db():
+    """Initializes present_student_ids and present_details_list from Today's DB records."""
+    global present_student_ids, present_details_list
+    try:
+        from db import get_attendance_by_date
+        today = datetime.now().strftime("%Y-%m-%d")
+        records = get_attendance_by_date(today)
+        
+        new_present_ids = set()
+        new_details_list = []
+        
+        # Latest should be at the bottom for the UI reversed list display
+        for r in reversed(records):
+            info = {
+                'name': r['name'],
+                'reg': r['reg_no'],
+                'course': r['course'],
+                'session': r['program'],
+                'date': str(r['date']),
+                'time': str(r['time_in'])
+            }
+            new_present_ids.add(r['reg_no'])
+            new_details_list.append(info)
+            
+        present_student_ids.clear()
+        present_student_ids.update(new_present_ids)
+        
+        present_details_list.clear()
+        present_details_list.extend(new_details_list)
+        return True
+    except Exception as e:
+        print(f"[Sync] Error synchronizing attendance: {e}")
+        return False
+
+def refresh_global_stats():
+    """Syncs everything (attendance, total students, all students) from DB to cache."""
+    global total_students_count, all_students_cache
+    try:
+        from db import get_all_students_minimal
+        # 1. Sync Attendance
+        sync_attendance_from_db()
+        
+        # 2. Sync Student Database
+        all_students_cache = get_all_students_minimal()
+        total_students_count = len(all_students_cache)
+        
+        # 3. Trigger UI callback if attached
+        if sidebar_stats_callback:
+            sidebar_stats_callback()
+            
+        return True
+    except Exception as e:
+        print(f"[Global Sync] Error: {e}")
+        return False

@@ -8,6 +8,8 @@ import customtkinter as ctk
 import admin_dashboard_files.shared as shared
 
 def show_generate_dataset_content(content_area, responsive_manager):
+    for widget in content_area.winfo_children():
+        widget.destroy()
 
     # ---------- UI HEADER ----------
     ctk.CTkLabel(
@@ -75,6 +77,9 @@ def show_generate_dataset_content(content_area, responsive_manager):
     status_label = ctk.CTkLabel(controls_frame, text="Ready", font=("Arial", 16, "bold"), text_color="white")
     status_label.pack(pady=10)
 
+    instruction_label = ctk.CTkLabel(controls_frame, text="Enter ID to begin.", font=("Arial", 12, "italic"), text_color="#3498DB", wraplength=260)
+    instruction_label.pack(pady=(0, 10))
+
     count_label = ctk.CTkLabel(controls_frame, text="0 / 100", font=("Arial", 14))
     count_label.pack(pady=5)
 
@@ -88,13 +93,48 @@ def show_generate_dataset_content(content_area, responsive_manager):
 
     # ---------------- CAPTURE STATE ----------------
     is_capturing = False
+    is_paused = False
     face_data = []
     max_faces = 100
-    face_cascade = cv2.CascadeClassifier("cascade/haarcascade_frontalface_default.xml")
+    current_stage = 0
+
+    capture_stages = [
+        {"target": 5, "instruction": "Stage 1/20: Neutral face (looking straight)."},
+        {"target": 10, "instruction": "Stage 2/20: Slight natural smile."},
+        {"target": 15, "instruction": "Stage 3/20: Big smile (teeth visible)."},
+        {"target": 20, "instruction": "Stage 4/20: Head turned slightly left (~15°)."},
+        {"target": 25, "instruction": "Stage 5/20: Head turned more left (~30°)."},
+        {"target": 30, "instruction": "Stage 6/20: Head turned slightly right (~15°)."},
+        {"target": 35, "instruction": "Stage 7/20: Head turned more right (~30°)."},
+        {"target": 40, "instruction": "Stage 8/20: Looking slightly up (Chin raised)."},
+        {"target": 45, "instruction": "Stage 9/20: Looking slightly down (Chin lowered)."},
+        {"target": 50, "instruction": "Stage 10/20: Tilt head left (Ear toward shoulder)."},
+        {"target": 55, "instruction": "Stage 11/20: Tilt head right (Ear toward shoulder)."},
+        {"target": 60, "instruction": "Stage 12/20: Eyes slightly closed / blinking."},
+        {"target": 65, "instruction": "Stage 13/20: Serious face (No emotion)."},
+        {"target": 70, "instruction": "Stage 14/20: Normal or Bright lighting."},
+        {"target": 75, "instruction": "Stage 15/20: Low lighting / Dim environment. (Cover camera slightly)"},
+        {"target": 80, "instruction": "Stage 16/20: Light from one side (Side shadow)."},
+        {"target": 85, "instruction": "Stage 17/20: Change your background / move slightly."},
+        {"target": 90, "instruction": "Stage 18/20: OPTIONAL: If you wear glasses, put them on. Else, stay neutral."},
+        {"target": 95, "instruction": "Stage 19/20: OPTIONAL: Take glasses off. Else, stay neutral."},
+        {"target": 100, "instruction": "Stage 20/20: Vary distance (Sit farther back, then move close)."}
+    ]
+    
+    try:
+        yunet_path = "dnn_model/face_detection_yunet.onnx"
+        yunet = cv2.FaceDetectorYN.create(yunet_path, "", (320, 320))
+        
+        sface_path = "dnn_model/face_recognition_sface.onnx"
+        sface = cv2.FaceRecognizerSF.create(sface_path, "")
+    except Exception as e:
+        print(f"Error loading YuNet or SFace model: {e}")
+        yunet = None
+        sface = None
 
     # ---------------- VIDEO LOOP ----------------
     def update_video_loop():
-        nonlocal is_capturing, face_data
+        nonlocal is_capturing, face_data, current_stage, is_paused
 
         if not content_area.winfo_exists():
             return
@@ -114,49 +154,75 @@ def show_generate_dataset_content(content_area, responsive_manager):
             return
 
         display_frame = frame.copy()
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        h_img, w_img = frame.shape[:2]
 
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.3,
-            minNeighbors=8,
-            minSize=(40, 40)
-        )
+        if yunet is not None and sface is not None:
+            yunet.setInputSize((w_img, h_img))
+            _, faces = yunet.detect(frame)
 
-        for (x, y, w, h) in faces:
-            if w < 60 or h < 60:
-                continue
+            if faces is not None:
+                # Prioritize biggest face by box area
+                faces_sorted = sorted(faces, key=lambda f: f[2]*f[3], reverse=True)
+                face = faces_sorted[0]
 
-            aspect_ratio = w / h
-            if aspect_ratio < 0.75 or aspect_ratio > 1.3:
-                continue
+                box = face[0:4].astype("int")
+                (startX, startY, w, h) = box
 
-            crop = frame[y:y+h, x:x+w]
-            face_gray = cv2.resize(crop, (100, 100))
-            face_gray = cv2.cvtColor(face_gray, cv2.COLOR_BGR2GRAY)
-            face_gray = cv2.equalizeHist(face_gray)
+                startX = max(0, startX)
+                startY = max(0, startY)
+                endX = min(w_img - 1, startX + w)
+                endY = min(h_img - 1, startY + h)
+                w = endX - startX
+                h = endY - startY
 
-            if is_capturing:
-                if face_gray.mean() < 50:
-                    continue
-                if len(face_data) > 0:
-                    similarities = [cv2.absdiff(f, face_gray).mean() for f in face_data[-5:]]
-                    if min(similarities) < 8:
-                        continue
-                face_data.append(face_gray)
-                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 79, 255), 2)
-            else:
-                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (255, 79, 0), 2)
+                if w >= 60 and h >= 60:
+                    aspect_ratio = w / h
+                    if 0.75 <= aspect_ratio <= 1.3:
+                        try:
+                            # Perfectly align the face using YuNet's 5 physical landmarks
+                            aligned_face = sface.alignCrop(frame, face)
+                            
+                            x, y = startX, startY
+
+                            if is_capturing:
+                                if aligned_face.mean() < 30:
+                                    pass # Too dark
+                                else:
+                                    save_frame = True
+                                    if len(face_data) > 0:
+                                        similarities = [cv2.absdiff(f, aligned_face).mean() for f in face_data[-5:]]
+                                        if min(similarities) < 8:
+                                            save_frame = False
+                                    
+                                    if save_frame:
+                                        face_data.append(aligned_face)
+                                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 79, 255), 2)
+                                
+                                # Draw YuNet landmarks dynamically during capture
+                                for i in range(5):
+                                    pt = (int(face[4 + i*2]), int(face[5 + i*2]))
+                                    cv2.circle(display_frame, pt, 2, (0, 255, 0), -1)
+                            else:
+                                cv2.rectangle(display_frame, (x, y), (x+w, y+h), (255, 79, 0), 2)
+                        except Exception as align_e:
+                            print(f"Alignment Error: {align_e}")
 
         if is_capturing:
             progress = len(face_data) / max_faces
             progress_bar.set(progress)
             count_label.configure(text=f"{len(face_data)} / {max_faces}")
-            if len(face_data) >= max_faces:
+            
+            target = capture_stages[current_stage]["target"]
+            if len(face_data) >= target:
                 is_capturing = False
-                save_dataset()
+                if len(face_data) >= max_faces:
+                    save_dataset()
+                else:
+                    is_paused = True
+                    current_stage += 1
+                    status_label.configure(text="PAUSED", text_color="#F39C12")
+                    instruction_label.configure(text=capture_stages[current_stage]["instruction"], text_color="#F39C12")
+                    btn_resume.pack(fill="x", padx=20, pady=(0, 15))
 
         img = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(img)
@@ -191,12 +257,13 @@ def show_generate_dataset_content(content_area, responsive_manager):
             np.save(file_path, data_arr)
 
             status_label.configure(text=f"Dataset saved for {student_id}", text_color="#2ECC71")
+            instruction_label.configure(text="Capture complete! You can train the student now.", text_color="gray")
             face_data.clear()
             id_entry.delete(0, "end")
 
     # ---------------- START BUTTON ----------------
     def start_capture():
-        nonlocal is_capturing, face_data
+        nonlocal is_capturing, face_data, current_stage, is_paused
         student_id = id_entry.get().strip()
 
         if not student_id:
@@ -213,8 +280,13 @@ def show_generate_dataset_content(content_area, responsive_manager):
             return
 
         face_data = []
+        current_stage = 0
+        is_paused = False
         is_capturing = True
+        
         status_label.configure(text="Capturing...", text_color="white")
+        instruction_label.configure(text=capture_stages[0]["instruction"], text_color="#2ECC71")
+        btn_resume.pack_forget()
 
     btn_start = ctk.CTkButton(
         controls_frame,
@@ -227,6 +299,26 @@ def show_generate_dataset_content(content_area, responsive_manager):
         command=start_capture
     )
     btn_start.pack(fill="x", padx=20, pady=(0, 15))
+
+    def resume_capture():
+        nonlocal is_capturing, is_paused
+        is_paused = False
+        is_capturing = True
+        status_label.configure(text="Capturing...", text_color="white")
+        instruction_label.configure(text=capture_stages[current_stage]["instruction"], text_color="#2ECC71")
+        btn_resume.pack_forget()
+
+    btn_resume = ctk.CTkButton(
+        controls_frame,
+        text="▶ CONTINUE NEXT STAGE",
+        fg_color="#F39C12",
+        hover_color="#D68910",
+        height=45,
+        font=("Arial", 14, "bold"),
+        corner_radius=10,
+        command=resume_capture
+    )
+    # Initially hidden
 
     # ---------------- CLEANUP ----------------
     def on_cleanup(event=None):

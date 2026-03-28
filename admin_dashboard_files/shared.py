@@ -34,108 +34,135 @@ import admin_dashboard_files.config_manager as config_manager
 # GLOBALS
 # =============================================================================
 
-camera_cap = None
-
-# ✅ ONLY TWO CAMERAS
-available_camera_indices = [0, 1]
-
-# ✅ FORCE STABLE BACKEND (BEST FOR WINDOWS)
-camera_backends = {
-    0: cv2.CAP_DSHOW,
-    1: cv2.CAP_DSHOW
-}
-
 # =============================================================================
-# CAMERA DETECTION (BACKGROUND)
+# CAMERA MANAGER (SEAMLESS SWITCHING)
 # =============================================================================
-def detect_cameras_bg():
-    global available_camera_indices, camera_backends
+class CameraManager:
+    def __init__(self):
+        self.pool = {}
+        self.active_index = config_manager.get("camera_index") or 0
+        self.is_running = True
+        self.lock = threading.Lock()
+        
+    def warmup(self):
+        """Initializes all available cameras in the background."""
+        for i in [0, 1]:
+            threading.Thread(target=self._init_camera, args=(i,), daemon=True).start()
 
-    found = []
-    backends = {}
+    def _init_camera(self, index):
+        try:
+            # Try MSMF (Fastest) then DSHOW
+            cap = cv2.VideoCapture(index, cv2.CAP_MSMF)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+            
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                with self.lock:
+                    self.pool[index] = cap
+                
+                # Start a "drainer" for this specific camera to keep buffer fresh
+                threading.Thread(target=self._drain_buffers, args=(index,), daemon=True).start()
+                print(f"[Camera] {index} warmed up and draining.")
+        except Exception as e:
+            print(f"[Camera] Failed to init {index}: {e}")
 
-    for i in range(2):  # ONLY CHECK 0 AND 1
-        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
-        if cap.isOpened():
-            ret, _ = cap.read()
-            if ret:
-                found.append(i)
-                backends[i] = cv2.CAP_DSHOW
-            cap.release()
+    def _drain_buffers(self, index):
+        """Constantly reads frames to ensure the 'next' read is live, not cached."""
+        while self.is_running:
+            with self.lock:
+                cap = self.pool.get(index)
+            if cap and cap.isOpened():
+                # If this is the active camera, the UI loop will read it.
+                # If NOT active, we must grab and discard to keep buffer fresh.
+                if index != self.active_index:
+                    try:
+                        cap.grab() # grab() is lighter than read()
+                    except:
+                        pass
+            time.sleep(0.01) # Small sleep to avoid CPU pin
 
-    if found:
-        available_camera_indices = found
-        camera_backends.update(backends)
-    else:
-        available_camera_indices = [0]
-        camera_backends[0] = cv2.CAP_DSHOW
+    @property
+    def camera_cap(self):
+        """Returns the current active VideoCapture object."""
+        with self.lock:
+            cap = self.pool.get(self.active_index)
+        if cap is None or not cap.isOpened():
+            # Lazy re-init if needed
+            self._init_camera(self.active_index)
+            return None
+        return cap
 
-    print(f"[Camera] Verified indices: {available_camera_indices}")
-
-threading.Thread(target=detect_cameras_bg, daemon=True).start()
-
-# =============================================================================
-# CAMERA CONTROL
-# =============================================================================
-def start_camera_stream(index=None):
-    global camera_cap, current_camera_index
-
-    if index is None:
-        index = current_camera_index
-
-    if camera_cap is not None and camera_cap.isOpened():
+    def switch(self, index):
+        print(f"[Camera] Instant switch to {index}")
+        self.active_index = index
         return True
 
-    print(f"[Camera] Starting camera {index}...")
+    def release_all(self):
+        self.is_running = False
+        with self.lock:
+            for cap in self.pool.values():
+                cap.release()
+            self.pool.clear()
 
-    # ✅ FORCE DSHOW
-    camera_cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+# Global Singleton
+manager = CameraManager()
+manager.warmup()
 
-    if not camera_cap.isOpened():
-        print(f"[Camera] Failed to open camera {index}")
-        return False
+# Dynamics via Module-level __getattr__ (Python 3.7+)
+def __getattr__(name):
+    if name == "available_camera_indices":
+        with manager.lock:
+            return list(manager.pool.keys()) if manager.pool else [0, 1]
+    if name == "current_camera_index":
+        return manager.active_index
+    if name == "camera_cap":
+        return camera_cap_proxy
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
-    # Improve quality
-    try:
-        camera_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        camera_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        camera_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        camera_cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-    except:
-        pass
+# Helper functions for backward compatibility
+def start_camera_stream(index=None): 
+    if index is not None: manager.active_index = index
+    return manager.camera_cap is not None
 
-    return True
+def switch_camera_live(index): 
+    return manager.switch(index)
 
+def release_camera_stream(): 
+    pass # We keep them warm
 
-def release_camera_stream():
-    global camera_cap
-    if camera_cap:
-        camera_cap.release()
-    camera_cap = None
+def release_all_cameras(): 
+    manager.release_all()
 
+# Export a dynamic-acting object for 'shared.camera_cap'
+class SharedCameraProxy:
+    def __getattr__(self, name):
+        cap = manager.camera_cap
+        if cap is not None: 
+            return getattr(cap, name)
+        raise AttributeError(f"Camera not ready for attribute '{name}'")
+    
+    def isOpened(self):
+        cap = manager.camera_cap
+        return cap is not None and cap.isOpened()
+    
+    def read(self):
+        cap = manager.camera_cap
+        if cap: return cap.read()
+        return False, None
 
-# ✅ FIXED SWITCHING (CRITICAL)
-def switch_camera_live(index):
-    global current_camera_index
-
-    print(f"[Camera] Switching to camera {index}")
-
-    current_camera_index = index
-
-    # Step 1: Release current camera
-    release_camera_stream()
-
-    # Step 2: Small delay (important)
-    time.sleep(0.3)
-
-    # Step 3: Start new camera
-    start_camera_stream(index)
+camera_cap_proxy = SharedCameraProxy()
+# Note: we don't define 'camera_cap' here as a global because __getattr__ handles it
 
 
 # =============================================================================
 # SETTINGS
 # =============================================================================
-current_camera_index = config_manager.get("camera_index") or 0
+# current_camera_index is handled dynamically via __getattr__
 
 # =============================================================================
 # ATTENDANCE STATE (GLOBAL CACHE)

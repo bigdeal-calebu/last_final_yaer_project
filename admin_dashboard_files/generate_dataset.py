@@ -40,6 +40,8 @@ def show_generate_dataset_content(content_area, responsive_manager):
     ds_cam_btns = {}
 
     def select_cam_ds(idx):
+        if idx == shared.current_camera_index:
+            return
         shared.switch_camera_live(idx)
         for i, b in ds_cam_btns.items():
             b.configure(fg_color="#2ECC71" if i == idx else "#333333")
@@ -63,10 +65,22 @@ def show_generate_dataset_content(content_area, responsive_manager):
         b2.pack(side="left", padx=2)
         ds_cam_btns[ci] = b2
 
-    # ---------------- Student ID ----------------
-    ctk.CTkLabel(controls_frame, text="Student ID:", font=("Arial", 12)).pack(anchor="w", padx=20, pady=(5,0))
+    # ---------------- Target Role ----------------
+    ctk.CTkLabel(controls_frame, text="Target Role:", font=("Arial", 12)).pack(anchor="w", padx=20, pady=(10, 3))
+    role_var = ctk.StringVar(value="Student")
+    role_btn = ctk.CTkSegmentedButton(controls_frame, values=["Student", "Admin"], variable=role_var, 
+                                      selected_color="#2ECC71", height=35)
+    role_btn.pack(fill="x", padx=20, pady=(0, 15))
+
+    # ---------------- ID / Registration ----------------
+    id_lbl = ctk.CTkLabel(controls_frame, text="Student ID:", font=("Arial", 12))
+    id_lbl.pack(anchor="w", padx=20, pady=(5,0))
     id_entry = ctk.CTkEntry(controls_frame, placeholder_text="e.g. 2023-08-16868")
     id_entry.pack(fill="x", padx=20, pady=(0, 15))
+
+    def update_id_label(*args):
+        id_lbl.configure(text=f"{role_var.get()} ID:")
+    role_var.trace_add("write", update_id_label)
 
     # ---------------- Progress ----------------
     ctk.CTkLabel(controls_frame, text="Progress:", font=("Arial", 12)).pack(anchor="w", padx=20, pady=(5,0))
@@ -234,47 +248,47 @@ def show_generate_dataset_content(content_area, responsive_manager):
 
     # ---------------- SAVE DATASET ----------------
     def save_dataset():
-        student_id = id_entry.get().strip()
+        user_id = id_entry.get().strip()
+        role = role_var.get()
+        folder = "train_images" if role == "Student" else "train_images_admin"
+
         if len(face_data) > 0:
-            if not os.path.exists("train_images"):
-                os.makedirs("train_images")
+            if not os.path.exists(folder):
+                os.makedirs(folder)
 
-            file_path = f"train_images/{student_id}.npy"
+            file_path = f"{folder}/{user_id}.npy"
 
-            # ✅ ADDED: BLOCK DUPLICATE SAVE
             if os.path.exists(file_path):
                 status_label.configure(
-                    text="❌ Student ID already exists! Use another ID.",
+                    text=f"❌ {role} ID already exists!",
                     text_color="red"
                 )
                 face_data.clear()
                 return
 
             data_arr = np.asarray(face_data).reshape((len(face_data), -1))
-            if os.path.exists(file_path):
-                old_data = np.load(file_path)
-                data_arr = np.vstack((old_data, data_arr))
             np.save(file_path, data_arr)
 
-            status_label.configure(text=f"Dataset saved for {student_id}", text_color="#2ECC71")
-            instruction_label.configure(text="Capture complete! You can train the student now.", text_color="gray")
+            status_label.configure(text=f"Dataset saved for {user_id}", text_color="#2ECC71")
+            instruction_label.configure(text="Capture complete! Now run training.", text_color="gray")
             face_data.clear()
             id_entry.delete(0, "end")
 
     # ---------------- START BUTTON ----------------
     def start_capture():
         nonlocal is_capturing, face_data, current_stage, is_paused
-        student_id = id_entry.get().strip()
+        user_id = id_entry.get().strip()
+        role = role_var.get()
+        folder = "train_images" if role == "Student" else "train_images_admin"
 
-        if not student_id:
-            status_label.configure(text="Enter a valid Student ID!", text_color="red")
+        if not user_id:
+            status_label.configure(text=f"Enter a valid {role} ID!", text_color="red")
             return
 
-        # ✅ ADDED: BLOCK DUPLICATE BEFORE CAPTURE
-        file_path = f"train_images/{student_id}.npy"
+        file_path = f"{folder}/{user_id}.npy"
         if os.path.exists(file_path):
             status_label.configure(
-                text="❌ Student ID already exists! Use another ID.",
+                text=f"❌ {role} ID already exists!",
                 text_color="red"
             )
             return

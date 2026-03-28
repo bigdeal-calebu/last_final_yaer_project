@@ -109,6 +109,7 @@ def check_admin(email, password):
             admin_name = admin.get('full_name') or admin.get('name') or admin.get('username') or "Admin"
             admin['name'] = admin_name          # always available as admin_data['name']
             admin['photo_path'] = admin.get('image_path')  # always available as admin_data['photo_path']
+            admin['registration_no'] = admin.get('registration_no') # already in dict
             return True, f"Admin login successful! Welcome {admin_name}", admin
         else:
             return False, "Invalid admin email or password", None
@@ -120,27 +121,32 @@ def check_admin(email, password):
 # END check_admin
 
 # ------------------------------------------------------------------
-# add_new_admin(full_name, email, password, image_path=None)
+# add_new_admin(full_name, email, reg_no, password, image_path=None)
 # PURPOSE : Insert a new administrative user into the admin table.
-#           Checks for duplicate emails before inserting.
+#           Checks for duplicate emails or registration numbers.
 # RETURNS : (True, success_msg) or (False, error_msg)
 # ------------------------------------------------------------------
-def add_new_admin(full_name, email, password, image_path=None):
+def add_new_admin(full_name, email, reg_no, password, image_path=None):
     conn = get_connection()
     if conn is None:
         return False, "Database connection failed"
     try:
         cursor = conn.cursor()
         
-        # Prevent completely identical names to stop accidental duplicate clicks
+        # Check for duplicate email
         cursor.execute("SELECT id FROM admin WHERE email=%s", (email,))
         if cursor.fetchone():
             return False, "An administrator with that Email already exists."
+        
+        # Check for duplicate registration number
+        cursor.execute("SELECT id FROM admin WHERE registration_no=%s", (reg_no,))
+        if cursor.fetchone():
+            return False, "An administrator with that Registration Number already exists."
             
         cursor.execute("""
-            INSERT INTO admin (full_name, email, password, image_path)
-            VALUES (%s, %s, %s, %s)
-        """, (full_name, email, password, image_path))
+            INSERT INTO admin (full_name, email, registration_no, password, image_path)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (full_name, email, reg_no, password, image_path))
         
         conn.commit()
         return True, "New administrator successfully registered!"
@@ -161,7 +167,7 @@ def get_all_admins():
     if conn is None: return []
     try:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, full_name, email FROM admin")
+        cursor.execute("SELECT id, full_name, email, registration_no FROM admin")
         return cursor.fetchall()
     except Exception as e:
         print(f"Error fetching admins: {e}")
@@ -169,7 +175,31 @@ def get_all_admins():
     finally:
         cursor.close()
         conn.close()
-# END get_all_admins
+# ------------------------------------------------------------------
+# get_admin_by_regno(reg_no)
+# PURPOSE : Retrieve a single administrator by their registration number.
+#           Used by facial login to identify recognized admins.
+# RETURNS : Row dict with admin columns (normalized), or None.
+# ------------------------------------------------------------------
+def get_admin_by_regno(reg_no):
+    conn = get_connection()
+    if conn is None: return None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM admin WHERE registration_no=%s", (reg_no,))
+        admin = cursor.fetchone()
+        if admin:
+            admin['name'] = admin.get('full_name') or admin.get('username') or "Admin"
+            admin['photo_path'] = admin.get('image_path')
+            return admin
+        return None
+    except Exception as e:
+        print(f"Error fetching admin by Registration No: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+# END get_admin_by_regno
 
 # =================== HELPERS ===================
 # ------------------------------------------------------------------

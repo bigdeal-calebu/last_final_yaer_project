@@ -286,12 +286,13 @@ def show_face_recognition_content(content_area, responsive_manager):
     
     cam_btn_refs = {}
     def select_camera(idx):
-        switch_camera_live(idx)
-        placeholder.configure(text="Switching camera...")
-        placeholder.place(relx=0.5, rely=0.5, anchor="center")
-        for i,b in cam_btn_refs.items():
-            b.configure(fg_color="#3b9dd8" if i==idx else "#333333")
-        threading.Thread(target=lambda: start_camera_stream(idx), daemon=True).start()
+        if idx == shared.current_camera_index:
+            return
+            
+        shared.switch_camera_live(idx)
+        # Instant update for UI feedback
+        for i, b in cam_btn_refs.items():
+            b.configure(fg_color="#3b9dd8" if i == idx else "#333333")
     
     for cam_idx in [0,1]:  # laptop + external
         is_avail = cam_idx in shared.available_camera_indices
@@ -349,32 +350,35 @@ def show_face_recognition_content(content_area, responsive_manager):
 
 def train_all_students_bg(progress_callback, status_callback, done_callback, error_callback):
     """
-    Scans train_images/ for all .npy files, trains a combined LBPH model,
-    and updates the label map.
+    Scans both train_images/ and train_images_admin/ for all .npy files, 
+    trains a combined SFace embedding model, and updates the label map.
     """
     try:
-        data_dir_base = os.path.join(parent_dir, "train_images")
-        if not os.path.isdir(data_dir_base):
-            error_callback("train_images folder not found.")
-            return
+        data_dirs = [
+            os.path.join(parent_dir, "train_images"),
+            os.path.join(parent_dir, "train_images_admin")
+        ]
+        
+        all_files = []
+        for d in data_dirs:
+            if os.path.isdir(d):
+                all_files.extend([(d, f) for f in os.listdir(d) if f.endswith(".npy")])
 
-        student_files = [f for f in os.listdir(data_dir_base) if f.endswith(".npy")]
-        if not student_files:
-            error_callback("No student data (.npy) found in train_images.")
+        if not all_files:
+            error_callback("No dataset files (.npy) found in Students or Admin folders.")
             return
 
         import pickle
         new_db = {}
-        total_students = len(student_files)
+        total_subjects = len(all_files)
         total_images_processed = 0
         
-        # Load local SFace to prevent threading conflicts
         sface_bg = cv2.FaceRecognizerSF.create(os.path.join(parent_dir, "dnn_model", "face_recognition_sface.onnx"), "")
 
-        for idx, filename in enumerate(student_files):
-            student_id = filename[:-4] # Remove .npy
-            status_callback(f"Extracting 128D Embeddings {idx+1}/{total_students}: {student_id}")
-            file_path = os.path.join(data_dir_base, filename)
+        for idx, (dir_path, filename) in enumerate(all_files):
+            subject_id = filename[:-4]
+            status_callback(f"Extracting 128D Embeddings {idx+1}/{total_subjects}: {subject_id}")
+            file_path = os.path.join(dir_path, filename)
             
             try:
                 data = np.load(file_path)
@@ -382,31 +386,19 @@ def train_all_students_bg(progress_callback, status_callback, done_callback, err
                 embs = []
                 for i, row in enumerate(data):
                     try:
-                        # Reshape 112x112 color
                         img_np = row.reshape((112, 112, 3)).astype("uint8")
                         feature = sface_bg.feature(img_np)
                         embs.append(feature[0])
                         total_images_processed += 1
-                    except ValueError:
-                        # Fallback for old grayscale models
-                        try:
-                            img_np = row.reshape((100, 100)).astype("uint8")
-                            color = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-                            res = cv2.resize(color, (112, 112))
-                            feature = sface_bg.feature(res)
-                            embs.append(feature[0])
-                            total_images_processed += 1
-                        except:
-                            continue
                     except:
                         continue
                     if i % 10 == 0 or i == num_imgs - 1:
-                        current_p = (idx / total_students) + ((i + 1) / num_imgs / total_students)
+                        current_p = (idx / total_subjects) + ((i + 1) / (num_imgs * total_subjects))
                         progress_callback(current_p, f"Processed {total_images_processed} features...")
                 
                 if embs:
                     master_emb = np.mean(embs, axis=0)
-                    new_db[student_id] = master_emb
+                    new_db[subject_id] = master_emb
             except Exception as e:
                 print(f"Error loading {filename}: {e}")
                 continue

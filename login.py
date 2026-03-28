@@ -80,10 +80,32 @@ def create_login_ui(parent_frame, on_register_click=None, include_header=True, e
                 messagebox.showerror("Error", msg)
 
     # ================= LOGIN BUTTON =================
-    # ================= FORGOT PASSWORD LINK =================
-    btn_login = ctk.CTkButton(input_frame, text="LOGIN", height=60, fg_color="#206a9c", font=("Arial", 18, "bold"), command=perform_login)
+    btn_login = ctk.CTkButton(input_frame, text="LOGIN", height=55, fg_color="#206a9c", font=("Arial", 16, "bold"), command=perform_login)
     btn_login.pack(fill="x", pady=(20, 10))
 
+    # ================= FACIAL LOGIN TOGGLE =================
+    import facial_login
+    def switch_to_face():
+        # Restriction: Only Students (Users) can use facial login
+        if role_var.get() == "Admin":
+            messagebox.showwarning("Access Restricted", "Administrators are not allowed to use face login.\nPlease use your Email and Password.")
+            return
+
+        # Stop any existing camera loops
+        if hasattr(parent_frame, "stop_facial_loop"):
+            parent_frame.stop_facial_loop()
+        
+        facial_login.show_facial_login_ui(
+            parent_frame, 
+            on_user_success=on_user_login_success, 
+            on_admin_success=on_admin_login_success, 
+            on_back_to_manual=lambda: create_login_ui(parent_frame, on_register_click, False, False, on_back_click, on_user_login_success, on_admin_login_success, on_forgot_password_click)
+        )
+
+    btn_face = ctk.CTkButton(input_frame, text="📸 LOGIN WITH FACE", height=55, fg_color="#2ECC71", hover_color="#27AE60", text_color="#000000", font=("Arial", 16, "bold"), command=switch_to_face)
+    btn_face.pack(fill="x", pady=(0, 10))
+
+    # ================= FORGOT PASSWORD LINK =================
     btn_forgot = ctk.CTkButton(input_frame, text="Forgot Password?", fg_color="transparent",
                                  text_color="#F39C12", font=("Arial", 12, "bold"), hover_color="#333", command=on_forgot_password_click)
     btn_forgot.pack(pady=(0, 5))

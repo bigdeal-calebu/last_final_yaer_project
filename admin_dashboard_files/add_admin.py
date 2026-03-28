@@ -40,6 +40,10 @@ def show_add_admin_content(content_area, responsive_manager):
     name_entry = ctk.CTkEntry(left_col, height=45, placeholder_text="e.g. John Doe", fg_color="#121212", border_color="#444", text_color="white")
     name_entry.pack(fill="x", pady=(0, 20))
     
+    ctk.CTkLabel(left_col, text="Registration Number", font=("Arial", 12, "bold"), text_color="#aaaaaa").pack(anchor="w", pady=(0,5))
+    reg_entry = ctk.CTkEntry(left_col, height=45, placeholder_text="e.g. ADM-2024-001", fg_color="#121212", border_color="#444", text_color="white")
+    reg_entry.pack(fill="x", pady=(0, 20))
+    
     ctk.CTkLabel(left_col, text="Email Address", font=("Arial", 12, "bold"), text_color="#aaaaaa").pack(anchor="w", pady=(0,5))
     email_entry = ctk.CTkEntry(left_col, height=45, placeholder_text="admin@university.edu", fg_color="#121212", border_color="#444", text_color="white")
     email_entry.pack(fill="x", pady=(0, 20))
@@ -82,11 +86,12 @@ def show_add_admin_content(content_area, responsive_manager):
         nonlocal selected_image_path
         
         full_name = name_entry.get().strip()
+        reg_no = reg_entry.get().strip()
         email = email_entry.get().strip()
         password = pass_entry.get().strip()
         
         # Validation checks
-        if not full_name or not email or not password:
+        if not full_name or not reg_no or not email or not password:
             messagebox.showerror("Validation Error", "Please fill out all required text fields.")
             return
             
@@ -117,13 +122,14 @@ def show_add_admin_content(content_area, responsive_manager):
                 return
 
         # Save to database
-        success, msg = add_new_admin(full_name, email, password, final_image_path)
+        success, msg = add_new_admin(full_name, email, reg_no, password, final_image_path)
         
         if success:
             messagebox.showinfo("Success", msg)
             
             # Clear the form logic
             name_entry.delete(0, 'end')
+            reg_entry.delete(0, 'end')
             email_entry.delete(0, 'end')
             pass_entry.delete(0, 'end')
             
@@ -177,12 +183,13 @@ def show_add_admin_content(content_area, responsive_manager):
             
             name = admin.get('full_name') or admin.get('name') or admin.get('username') or "Admin"
             email = admin.get('email', 'No Email')
+            reg_no = admin.get('registration_no', 'No Reg No')
             
             info_frame = ctk.CTkFrame(card, fg_color="transparent")
             info_frame.pack(side="left", fill="both", expand=True, padx=20, pady=15)
             
             ctk.CTkLabel(info_frame, text=name, font=("Arial", 18, "bold"), text_color="white").pack(anchor="w")
-            ctk.CTkLabel(info_frame, text=email, font=("Arial", 14), text_color="#aaaaaa").pack(anchor="w", pady=(5, 0))
+            ctk.CTkLabel(info_frame, text=f"Reg No: {reg_no} | Email: {email}", font=("Arial", 14), text_color="#aaaaaa").pack(anchor="w", pady=(5, 0))
 
     ctk.CTkButton(left_col, text="👁️ VIEW REGISTERED ADMINS", height=50, 
                   font=("Arial", 14, "bold"), fg_color="#3498DB", hover_color="#2980B9", text_color="white", 

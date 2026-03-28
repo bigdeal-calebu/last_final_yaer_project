@@ -15,9 +15,9 @@ import os
 #           append extra widgets (e.g. admin avatar) to the right side.
 # ------------------------------------------------------------------
 def create_header(parent, title_text="Smart Attendance System", subtitle_text="Admin Dashboard"):
-    # Main Header Frame
-    header_frame = ctk.CTkFrame(parent, fg_color="transparent")
-    header_frame.pack(fill="x", padx=10, pady=(10, 5)) # Reduced outer padding for more space
+    # Main Header Frame with Premium Separator
+    header_frame = ctk.CTkFrame(parent, fg_color="#101214", border_width=1, border_color="#2b2b2b") # Midnight Rich Palette
+    header_frame.pack(fill="x", padx=10, pady=(5, 5)) 
     
     # 3-Column Layout: Column 1 (Title) is the only one that expands
     header_frame.columnconfigure(0, weight=0) # Logo stays fixed size
@@ -25,20 +25,20 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
     header_frame.columnconfigure(2, weight=0) # Controls stays fixed size
 
     # --- 1️⃣ LOGO SECTION ---
-    logo_container = ctk.CTkFrame(header_frame, corner_radius=70, fg_color="#1f1f1f")
+    logo_container = ctk.CTkFrame(header_frame, corner_radius=20, fg_color="#1a1c1e") # Subtle contrast for logo
     logo_container.grid(row=0, column=0, sticky="w")
     logo_container.grid_propagate(False)
 
     logo_label = ctk.CTkLabel(logo_container, text="")
-    logo_label.place(relx=0.5, rely=0.42, anchor="center")
+    logo_label.place(relx=0.5, rely=0.5, anchor="center") # Centered perfectly
 
     tagline_label = ctk.CTkLabel(logo_container, text="", 
-                                 text_color="#F5610C", font=("Segoe UI Variable", 10, "bold"))
+                                 text_color="#F5610C")
     tagline_label.place(relx=0.5, rely=0.8, anchor="center")
 
     # --- 2️⃣ TITLE SECTION (The "Spacer" between logo and button) ---
     title_sub_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-    title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=10) # Added padx to prevent touching logo/btn
+    title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10) # Balanced height
 
     main_title = ctk.CTkLabel(
         title_sub_frame, 
@@ -64,16 +64,16 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
 
     import modify_live
     refresh_btn = ctk.CTkButton(
-        controls_frame, text="🔄", width=40, height=40, corner_radius=20,
+        controls_frame, text="🔄", width=30, height=30, corner_radius=15,
         fg_color="#3498DB", hover_color="#2980B9", text_color="#000000",
-        font=("Arial", 14, "bold"), command=modify_live.trigger_live_refresh
+        font=("Arial", 12, "bold"), command=modify_live.trigger_live_refresh
     )
-    refresh_btn.pack(side="right", padx=(0, 10))
+    refresh_btn.pack(side="right", padx=(0, 5))
 
     theme_btn = ctk.CTkButton(
-        controls_frame, text="☀️", width=40, height=40, corner_radius=20,
+        controls_frame, text="☀️", width=30, height=30, corner_radius=15,
         fg_color="#2ECC71", hover_color="#27AE60", text_color="#000000",
-        font=("Arial", 14, "bold")
+        font=("Arial", 12, "bold")
     )
     theme_btn.pack(side="right")
 
@@ -103,36 +103,88 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
     def on_resize(event):
         width = event.width
         
-        if width < 600: # MOBILE MODE
-            # A very narrow wraplength prevents overlapping logo/buttons
-            main_title.configure(font=("Segoe UI Variable Display", 15, "bold"), wraplength=140) 
-            sub_title.configure(font=("Segoe UI Variable Small", 10, "italic"), wraplength=140)
+        if width < 400: # TINY MODE (Smaller Android Phones)
+            # Increased wraplength to keep the phrase whole on one line
+            main_title.configure(font=("Segoe UI Variable Display", 12, "bold"), wraplength=200) 
+            sub_title.configure(font=("Segoe UI Variable Small", 9, "italic"), wraplength=200)
             
-            logo_container.configure(width=75, height=90)
-            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 7, "bold"))
-            update_logo_image(40)
+            # --- Grid Layout Update: Move buttons BELOW title ---
+            logo_container.grid_configure(row=0, column=0, rowspan=2, sticky="w", padx=(5, 0))
+            title_sub_frame.grid_configure(row=0, column=1, sticky="w", pady=(6, 0), padx=(5, 0))
+            controls_frame.grid_configure(row=1, column=1, sticky="w", pady=(0, 6), padx=(5, 0))
             
-            theme_btn.configure(width=28, height=28)
+            # Subtitle stays compact
+            sub_title.pack_configure(pady=(0, 2))
             
+            logo_container.configure(width=58, height=85, corner_radius=29) 
+            tagline_label.configure(text="", font=("Segoe UI Variable", 1)) # Hide tagline
+            update_logo_image(35)
+            
+            # Auto-shrink all buttons
+            for child in controls_frame.winfo_children():
+                if isinstance(child, (ctk.CTkButton, ctk.CTkLabel)):
+                    try:
+                        child.configure(width=24, height=24)
+                        if hasattr(child, "configure") and child.cget("text") == "☰":
+                            child.configure(font=("Segoe UI", 15, "bold"))
+                    except: pass
+
+        elif width < 600: # MOBILE MODE
+            main_title.configure(font=("Segoe UI Variable Display", 15, "bold"), wraplength=280) 
+            sub_title.configure(font=("Segoe UI Variable Small", 11, "italic"), wraplength=280)
+            
+            # --- Grid Layout Update: Move buttons BELOW title ---
+            logo_container.grid_configure(row=0, column=0, rowspan=2, sticky="w", padx=(8, 0))
+            title_sub_frame.grid_configure(row=0, column=1, sticky="w", pady=(8, 0), padx=(10, 0))
+            controls_frame.grid_configure(row=1, column=1, sticky="w", pady=(0, 8), padx=(10, 0))
+            
+            sub_title.pack_configure(pady=(0, 4))
+
+            logo_container.configure(width=76, height=95, corner_radius=38) 
+            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 7, "bold")) 
+            update_logo_image(48)
+            
+            for child in controls_frame.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(width=28, height=28)
+
         elif width < 1000: # TABLET MODE
-            main_title.configure(font=("Segoe UI Variable Display", 22, "bold"), wraplength=400) 
-            sub_title.configure(font=("Segoe UI Variable Small", 13, "italic"), wraplength=400)
+            # Reset grid to standard 1-row layout
+            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=0)
+            title_sub_frame.grid_configure(row=0, column=1, sticky="nsew", pady=10, padx=10)
+            controls_frame.grid_configure(row=0, column=2, sticky="e", pady=0, padx=0)
             
-            logo_container.configure(width=110, height=140)
-            tagline_label.configure(text="FACE RECOGNITION", font=("Segoe UI Variable", 9, "bold"))
-            update_logo_image(70)
+            main_title.configure(font=("Segoe UI Variable Display", 18, "bold"), wraplength=400) 
+            sub_title.configure(font=("Segoe UI Variable Small", 12, "italic"), wraplength=400)
             
-            theme_btn.configure(width=35, height=35)
+            logo_container.configure(width=100, height=100, corner_radius=50)
+            sub_title.pack_configure(pady=(0, 5))
+
+            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 8, "bold"))
+            update_logo_image(65)
+            
+            for child in controls_frame.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(width=32, height=32)
             
         else: # DESKTOP MODE
-            main_title.configure(font=("Segoe UI Variable Display", 34, "bold"), wraplength=900) 
-            sub_title.configure(font=("Segoe UI Variable Small", 18, "italic"), wraplength=900)
+            # Reset grid to standard 1-row layout
+            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=0)
+            title_sub_frame.grid_configure(row=0, column=1, sticky="nsew", pady=10, padx=10)
+            controls_frame.grid_configure(row=0, column=2, sticky="e", pady=0, padx=0)
             
-            logo_container.configure(width=150, height=180)
-            tagline_label.configure(text="RECOGNITION SYSTEM", font=("Segoe UI Variable", 11, "bold"))
-            update_logo_image(110)
+            main_title.configure(font=("Segoe UI Variable Display", 24, "bold"), wraplength=900) 
+            sub_title.configure(font=("Segoe UI Variable Small", 16, "italic"), wraplength=900)
             
-            theme_btn.configure(width=45, height=45)
+            logo_container.configure(width=120, height=120, corner_radius=60)
+            sub_title.pack_configure(pady=(0, 5))
+
+            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 10, "bold"))
+            update_logo_image(80)
+            
+            for child in controls_frame.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(width=36, height=36)
 
     header_frame.bind("<Configure>", on_resize)
     # END on_resize

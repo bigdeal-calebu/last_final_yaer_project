@@ -1,0 +1,183 @@
+. Basics of Image Processing
+
+Introduction to Digital Image Processing
+
+Types of Digital Images:
+
+Grayscale
+
+Color (RGB, HSV, LAB)
+
+Binary
+
+Image Representation in Computers (Pixels, Bit Depth)
+
+Image Acquisition (Cameras, Scanners, Sensors)
+
+Image File Formats: JPEG, PNG, BMP, TIFF
+
+2. Image Fundamentals
+
+Color Spaces and Color Models (RGB, HSV, HSL, YUV, LAB)
+
+Image Resolution and DPI
+
+Image Histograms and Histogram Analysis
+
+Image Quantization and Sampling
+
+Image Geometry: Coordinates, Scaling, Rotation, Translation
+
+3. Image Enhancement
+
+Brightness and Contrast Adjustment
+
+Gamma Correction
+
+Histogram Equalization
+
+CLAHE (Contrast Limited Adaptive Histogram Equalization)
+
+Noise Reduction Techniques:
+
+Gaussian Blur
+
+Median Filter
+
+Bilateral Filter
+
+Non-local Means Denoising
+
+Sharpening Techniques (Kernel Convolution, Laplacian)
+
+Edge Enhancement and Edge Detection (Sobel, Prewitt, Canny)
+
+4. Geometric and Spatial Transformations
+
+Image Translation, Rotation, Scaling
+
+Affine Transformations
+
+Perspective Transformations (Homography)
+
+Image Cropping and ROI Selection
+
+Image Flipping and Mirroring
+
+5. Filtering and Convolution
+
+Spatial Filtering (Kernel-based Filtering)
+
+Convolution and Correlation
+
+Low-pass Filters (Smoothing, Blur)
+
+High-pass Filters (Edge Detection, Laplacian)
+
+Frequency Domain Filtering (Fourier Transform, DFT)
+
+Gaussian Filtering
+
+Median Filtering
+
+6. Morphological Image Processing
+
+Erosion and Dilation
+
+Opening and Closing
+
+Morphological Gradient
+
+Top-hat and Black-hat Transformations
+
+Skeletonization and Thinning
+
+7. Image Segmentation
+
+Thresholding Techniques:
+
+Global Thresholding
+
+Adaptive Thresholding
+
+Otsu’s Method
+
+Edge-based Segmentation
+
+Region-based Segmentation
+
+Watershed Algorithm
+
+Clustering Techniques (K-means, Mean Shift)
+
+Contour Detection and Analysis
+
+8. Feature Detection and Description
+
+Corner Detection (Harris, Shi-Tomasi)
+
+Blob Detection (LoG, DoG, DoH)
+
+SIFT (Scale-Invariant Feature Transform)
+
+SURF (Speeded Up Robust Features)
+
+ORB (Oriented FAST and Rotated BRIEF)
+
+HOG (Histogram of Oriented Gradients)
+
+Feature Matching (BFMatcher, FLANN)
+
+9. Image Restoration
+
+Noise Modeling and Removal
+
+Deconvolution
+
+Motion Blur Removal
+
+Image Inpainting
+
+Artifact Removal (JPEG Compression Artifacts)
+
+10. Image Compression
+
+Lossless Compression Techniques (PNG, Huffman, Run-length)
+
+Lossy Compression Techniques (JPEG, MPEG)
+
+Image Coding and Quantization
+
+11. Image Analysis
+
+Object Detection
+
+Object Recognition
+
+Face Detection and Recognition
+
+Motion Detection and Tracking
+
+Background Subtraction
+
+Optical Flow
+
+Template Matching
+
+12. Advanced Topics
+
+Image Super-Resolution
+
+Deep Learning for Image Processing (CNNs, Autoencoders)
+
+Image Style Transfer
+
+3D Image Processing and Stereo Vision
+
+HDR Imaging
+
+Panoramic Image Stitching
+
+Real-time Video Processing
+
+GPU Acceleration for Image Processing (CUDA, OpenCL)

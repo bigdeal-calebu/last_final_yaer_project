@@ -112,6 +112,15 @@ def show_settings_content(content_area, responsive_manager):
     start_date_var = ctk.StringVar(value=config_manager.get("starting_date"))
     ctk.CTkEntry(period_container, textvariable=start_date_var, width=200, placeholder_text="e.g. 2024-01-01").pack(anchor="w", padx=20, pady=5)
 
+    ctk.CTkLabel(period_container, text="Target Attendance Goal (%)", font=("Arial", 12, "bold"), text_color="gray", wraplength=wrap_len).pack(anchor="w", padx=20, pady=(15,0))
+    
+    goal_slider_var = ctk.IntVar(value=config_manager.get("attendance_goal", 80))
+    goal_val_lbl = ctk.CTkLabel(period_container, text=f"{goal_slider_var.get()}%", font=("Arial", 14, "bold"))
+    goal_val_lbl.pack(anchor="w", padx=20)
+    
+    def on_goal_slide(val): goal_val_lbl.configure(text=f"{int(val)}%")
+    ctk.CTkSlider(period_container, from_=40, to=100, number_of_steps=60, variable=goal_slider_var, command=on_goal_slide, progress_color="#F39C12").pack(fill="x", padx=20, pady=5)
+
     # --- SAVE ---
     def save_all_settings():
         try:
@@ -119,6 +128,7 @@ def show_settings_content(content_area, responsive_manager):
             config_manager.set_val("process_every_n_frames", int(frame_slider_var.get()))
             config_manager.set_val("confidence_threshold", int(conf_slider_var.get()))
             config_manager.set_val("starting_date", start_date_var.get().strip())
+            config_manager.set_val("attendance_goal", int(goal_slider_var.get()))
             
             new_theme = "Dark" if dark_mode_var.get() else "Light"
             config_manager.set_val("appearance_mode", new_theme)

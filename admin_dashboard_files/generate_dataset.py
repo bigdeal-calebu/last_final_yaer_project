@@ -6,6 +6,9 @@ import threading
 from PIL import Image, ImageTk
 import customtkinter as ctk
 import admin_dashboard_files.shared as shared
+import zipfile
+from tkinter import filedialog
+import io
 
 def show_generate_dataset_content(content_area, responsive_manager):
     for widget in content_area.winfo_children():
@@ -41,14 +44,45 @@ def show_generate_dataset_content(content_area, responsive_manager):
 
     ctk.CTkLabel(
         controls_frame,
-        text="CONFIGURATION",
+        text="INPUT METHOD",
         font=("Arial", 14, "bold"),
         text_color="gray"
-    ).pack(pady=(20, 10))
+    ).pack(pady=(20, 5))
 
-    # ---------------- Camera Selection ----------------
-    ctk.CTkLabel(controls_frame, text="Camera:", font=("Arial", 12)).pack(anchor="w", padx=20, pady=(0, 3))
-    cam_row_ds = ctk.CTkFrame(controls_frame, fg_color="transparent")
+    mode_var = ctk.StringVar(value="Camera Capture")
+    mode_switch = ctk.CTkSegmentedButton(controls_frame, values=["Camera Capture", "ZIP Upload"], 
+                                         variable=mode_var, selected_color="#3498DB", height=40)
+    mode_switch.pack(fill="x", padx=20, pady=(0, 20))
+
+    # --- Mode Containers ---
+    camera_controls_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+    camera_controls_frame.pack(fill="x")
+    
+    zip_controls_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+    # Not packed yet
+    
+    def switch_mode(*args):
+        if mode_var.get() == "Camera Capture":
+            zip_controls_frame.pack_forget()
+            camera_controls_frame.pack(fill="x")
+            camera_frame.pack(side="top" if is_small else "right", padx=15, pady=15)
+        else:
+            camera_controls_frame.pack_forget()
+            camera_frame.pack_forget()
+            zip_controls_frame.pack(fill="x", pady=20)
+            
+    mode_var.trace_add("write", switch_mode)
+
+    ctk.CTkLabel(
+        camera_controls_frame,
+        text="CAMERA CONFIGURATION",
+        font=("Arial", 14, "bold"),
+        text_color="gray"
+    ).pack(pady=(10, 10))
+
+    # ---------------- Camera Selection (Inside camera_controls_frame) ----------------
+    ctk.CTkLabel(camera_controls_frame, text="Camera Source:", font=("Arial", 12)).pack(anchor="w", padx=20, pady=(0, 3))
+    cam_row_ds = ctk.CTkFrame(camera_controls_frame, fg_color="transparent")
     cam_row_ds.pack(fill="x", padx=20, pady=(0, 12))
     ds_cam_btns = {}
 
@@ -110,6 +144,105 @@ def show_generate_dataset_content(content_area, responsive_manager):
 
     count_label = ctk.CTkLabel(controls_frame, text="0 / 100", font=("Arial", 14))
     count_label.pack(pady=5)
+
+    # ---------------- ZIP UPLOAD UI (Inside zip_controls_frame) ----------------
+    ctk.CTkLabel(
+        zip_controls_frame,
+        text="ZIP DATASET IMPORT",
+        font=("Arial", 14, "bold"),
+        text_color="gray"
+    ).pack(pady=(10, 10))
+
+    def select_zip_file():
+        path = filedialog.askopenfilename(filetypes=[("ZIP files", "*.zip")])
+        if path:
+            zip_path_var.set(path)
+            status_label.configure(text="ZIP Selected", text_color="#3498DB")
+            instruction_label.configure(text=f"Ready to process: {os.path.basename(path)}", text_color="white")
+
+    zip_path_var = ctk.StringVar(value="")
+    ctk.CTkButton(zip_controls_frame, text="📁 CHOOSE ZIP FOLDER", fg_color="#34495E", hover_color="#2C3E50", command=select_zip_file).pack(fill="x", padx=20, pady=10)
+    
+    def start_zip_processing_thread():
+        user_id = id_entry.get().strip()
+        role = role_var.get()
+        zip_path = zip_path_var.get()
+        
+        if not user_id:
+            status_label.configure(text=f"Enter {role} ID!", text_color="red")
+            return
+        if not zip_path:
+            status_label.configure(text="Select ZIP File!", text_color="red")
+            return
+            
+        threading.Thread(target=process_zip_upload, args=(zip_path, user_id, role), daemon=True).start()
+
+    btn_zip_process = ctk.CTkButton(
+        zip_controls_frame,
+        text="🚀 IMPORT & ALIGN DATASET",
+        fg_color="#2ECC71",
+        hover_color="#27AE60",
+        height=45,
+        font=("Arial", 14, "bold"),
+        command=start_zip_processing_thread
+    )
+    btn_zip_process.pack(fill="x", padx=20, pady=20)
+
+    def process_zip_upload(zip_path, user_id, role):
+        nonlocal face_data
+        try:
+            status_label.configure(text="Processing...", text_color="white")
+            progress_bar.set(0)
+            face_data = []
+            
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                # Find all image files
+                img_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
+                image_files = [f for f in z.namelist() if f.lower().endswith(img_exts) and not f.startswith('__MACOSX')]
+                
+                if not image_files:
+                    status_label.configure(text="No images in ZIP!", text_color="red")
+                    return
+                
+                total = len(image_files)
+                processed_count = 0
+                
+                for i, img_path in enumerate(image_files):
+                    try:
+                        with z.open(img_path) as f:
+                            data = f.read()
+                            img_np = np.frombuffer(data, np.uint8)
+                            img = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+                            
+                            if img is not None:
+                                h_i, w_i = img.shape[:2]
+                                yunet.setInputSize((w_i, h_i))
+                                _, faces = yunet.detect(img)
+                                
+                                if faces is not None:
+                                    # Pick biggest face
+                                    faces_sorted = sorted(faces, key=lambda f: f[2]*f[3], reverse=True)
+                                    face = faces_sorted[0]
+                                    
+                                    # Align and Crop
+                                    aligned = sface.alignCrop(img, face)
+                                    if aligned is not None:
+                                        face_data.append(aligned)
+                                        processed_count += 1
+                    except: continue
+                    
+                    # Update progress
+                    perc = (i + 1) / total
+                    progress_bar.set(perc)
+                    count_label.configure(text=f"{len(face_data)} faces found")
+                
+                if len(face_data) > 0:
+                    save_dataset() # Reuse existing save logic
+                else:
+                    status_label.configure(text="No faces found in images!", text_color="red")
+        except Exception as e:
+            status_label.configure(text="ZIP Error!", text_color="red")
+            print(f"ZIP Error: {e}")
 
 
 

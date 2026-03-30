@@ -15,7 +15,7 @@ def create_login_ui(parent_frame, on_register_click=None, include_header=True, e
 
     if not embedded:
         shadow_frame = ctk.CTkFrame(parent_frame, fg_color="#0f0f0f", corner_radius=40, width=540, height=640)
-        shadow_frame.pack(expand=True, pady=20)
+        shadow_frame.pack(expand=True, pady=10, anchor="n") # Anchor to top for mobile
         shadow_frame.pack_propagate(False)
 
         card_frame = ctk.CTkFrame(shadow_frame, fg_color="#1f1f1f", corner_radius=30, border_width=2, border_color="#333333")
@@ -44,7 +44,7 @@ def create_login_ui(parent_frame, on_register_click=None, include_header=True, e
 
     # ================= INPUTS =================
     input_frame = ctk.CTkFrame(scroll_content, fg_color="transparent")
-    input_frame.pack(fill="x", padx=40)
+    input_frame.pack(fill="x", padx=40) # Default padding
 
     login_entry_email = ctk.CTkEntry(input_frame, placeholder_text="Enter Email", height=50, fg_color="#252525",
                                      border_color="#333", text_color="#2ECC71")
@@ -119,13 +119,40 @@ def create_login_ui(parent_frame, on_register_click=None, include_header=True, e
     def on_resize(event=None):
         if shadow_frame is None or not shadow_frame.winfo_exists():
             return
+            
         width = parent_frame.winfo_width()
-        if width < 600:
-            shadow_frame.configure(width=width - 20)
+        height = parent_frame.winfo_height()
+        
+        # Adjust Card Size
+        if width < 500:
+            shadow_frame.configure(width=width - 10, height=min(640, height - 20))
+            shadow_frame.pack_configure(anchor="n", pady=(2, 10)) # Top anchor and tight margin
+            input_padx = 15
+            btn_font_size = 13
+            title_font_size = 30
         elif width < 800:
-            shadow_frame.configure(width=width - 80)
+            shadow_frame.configure(width=width - 80, height=min(640, height - 40))
+            shadow_frame.pack_configure(anchor="center", pady=20)
+            input_padx = 30
+            btn_font_size = 14
+            title_font_size = 35
         else:
-            shadow_frame.configure(width=540)
+            shadow_frame.configure(width=540, height=640)
+            shadow_frame.pack_configure(anchor="center", pady=20)
+            input_padx = 40
+            btn_font_size = 16
+            title_font_size = 40
+
+        # Apply dynamic styles
+        input_frame.pack_configure(padx=input_padx)
+        btn_login.configure(font=("Arial", btn_font_size, "bold"))
+        btn_face.configure(font=("Arial", btn_font_size, "bold"))
+        role_frame.configure(width=min(300, width - 40))
+        
+        # Find the "LOGIN" label to adjust its font
+        for child in scroll_content.winfo_children():
+            if isinstance(child, ctk.CTkLabel) and child.cget("text") == "LOGIN":
+                child.configure(font=("Arial", title_font_size, "bold"))
 
     parent_frame.bind("<Configure>", on_resize)
     on_resize()

@@ -233,6 +233,7 @@ def get_student_attendance_stats(reg_no, course):
         return None
     try:
         from datetime import datetime, timedelta, date, time
+        from admin_dashboard_files import config_manager
         cursor = conn.cursor(dictionary=True)
         
         # 1. Fetch all their records
@@ -243,23 +244,34 @@ def get_student_attendance_stats(reg_no, course):
             cursor.execute("SELECT date, time_in, status FROM attendance WHERE reg_no=%s ORDER BY date ASC", (reg_no,))
         records = cursor.fetchall()
         
-        # 2. Total classes held (distinct dates for the same course as a baseline approximation)
-        start_date = config_manager.get("starting_date")
+        # 2. Total classes held (Strict calculation from start_date to today)
         if start_date:
-            cursor.execute("SELECT COUNT(DISTINCT date) as total_held FROM attendance WHERE course=%s AND date >= %s", (course, start_date))
+            try:
+                if isinstance(start_date, str):
+                    s_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                else:
+                    s_date = start_date
+                today = datetime.now().date()
+                # Total days elapsed since the recognition start date
+                total_held = (today - s_date).days + 1
+                if total_held < len(records): total_held = len(records)
+            except:
+                total_held = len(records)
         else:
-            cursor.execute("SELECT COUNT(DISTINCT date) as total_held FROM attendance WHERE course=%s", (course,))
-        total_held = cursor.fetchone()['total_held']
-        if total_held == 0: total_held = len(records) # Fallback
+            total_held = len(records)
+            
+        if total_held <= 0: total_held = 1
             
         attended = len(records)
         missed = max(0, total_held - attended)
         percent = (attended / total_held * 100) if total_held > 0 else 0.0
         
-        # Status Color
-        if percent >= 90: status_info = ("Excellent", "#00c853")
-        elif percent >= 75: status_info = ("Good", "#3498db")
-        elif percent >= 60: status_info = ("Warning", "#f39c12")
+        # Status Color based on target goal
+        target_goal = config_manager.get("attendance_goal", 80)
+        
+        if percent >= target_goal: status_info = ("Excellent", "#00c853")
+        elif percent >= target_goal * 0.8: status_info = ("Good", "#3498db")
+        elif percent >= target_goal * 0.6: status_info = ("Warning", "#f39c12")
         else: status_info = ("Danger", "#e74c3c")
             
         # Streak
@@ -307,19 +319,21 @@ def get_student_attendance_stats(reg_no, course):
         month_held = cursor.fetchone()['held'] or 1
         month_perc = (len(month_records) / month_held * 100)
         
+        last_seen = str(today_record[0]['time_in']) if today_record else "---"
+
         return {
-            "Total classes to study": total_held,
-            "Classes Attended": attended,
-            "Classes Missed": missed,
-            "Attendance Percentage (%)": f"{percent:.1f}%",
-            "Status (Color-Coded)": status_info,
-            "Current Streak": f"{streak} days",
-            "Late Count": late,
-            "Weekly Attendance Rate": f"{this_week} days/wk",
-            "Trend Indicator": trend,
-            "Target Progress": f"Goal 80% (Current: {percent:.1f}%)",
-            "Today’s Attendance Status": today_status,
-            "Recognition Confidence": ("98.4% (Avg)", "#3498db")
+            "TOTAL DAYS FROM START": total_held,
+            "ATTENDED": attended,
+            "MISSED": missed,
+            "PROGRESS": f"{percent:.1f}%",
+            "STATUS": status_info,
+            "CURRENT STREAK": f"{streak} days",
+            "THIS WEEK": f"{this_week} days",
+            "TREND": trend,
+            "TODAY": today_status,
+            "MONTHLY PROGRESS": f"{month_perc:.1f}%",
+            "LAST SEEN": last_seen,
+            "GOAL (" + str(target_goal) + "%)": f"Current: {percent:.1f}%",
         }
     except Exception as e:
         print(f"Error fetching stats for {reg_no}: {e}")
@@ -1075,3 +1089,195 @@ def initialize_database():
 
 if __name__ == "__main__":
     initialize_database()
+
+
+# ------------------------------------------------------------------
+# export_student_attendance_to_csv(reg_no, course, student_name)
+# PURPOSE : Generate a CSV report of the student's attendance history
+#           including attended days and missed days.
+# ------------------------------------------------------------------
+def export_student_attendance_to_csv(reg_no, course, student_name):
+    try:
+        import csv
+        import os
+        from datetime import datetime, timedelta
+        from admin_dashboard_files import config_manager
+        
+        # 1. Fetch stats and attended records
+        stats = get_student_attendance_stats(reg_no, course)
+        if not stats: return False
+        
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        start_date_str = config_manager.get("starting_date")
+        
+        if start_date_str:
+            cursor.execute("SELECT date, time_in FROM attendance WHERE reg_no=%s AND date >= %s ORDER BY date ASC", (reg_no, start_date_str))
+        else:
+            cursor.execute("SELECT date, time_in FROM attendance WHERE reg_no=%s ORDER BY date ASC", (reg_no,))
+        
+        attended_records = cursor.fetchall()
+        attended_dates = {r['date'] for r in attended_records}
+        
+        # 2. Determine all possible days
+        today = datetime.now().date()
+        if start_date_str:
+            s_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        elif attended_records:
+            s_date = attended_records[0]['date']
+        else:
+            s_date = today
+            
+        # 3. Create file in Downloads
+        home = os.path.expanduser("~")
+        filename = f"Attendance_Report_{reg_no}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+        filepath = os.path.join(home, "Downloads", filename)
+        
+        with open(filepath, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["ATTENDANCE REPORT", student_name, reg_no])
+            writer.writerow(["Course", course])
+            writer.writerow(["Generated On", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+            writer.writerow([])
+            writer.writerow(["SUMMARY"])
+            writer.writerow(["Total Days from Start", stats.get("Total classes to study", "N/A")])
+            writer.writerow(["Days Attended", stats.get("Classes Attended", 0)])
+            writer.writerow(["Days Missed", stats.get("Classes Missed", 0)])
+            writer.writerow(["Attendance %", stats.get("Attendance Percentage (%)", "0%")])
+            writer.writerow([])
+            writer.writerow(["DATE", "STATUS", "TIME IN"])
+            
+            # Loop through all days from start to today
+            curr = s_date
+            while curr <= today:
+                status = "ATTENDED" if curr in attended_dates else "MISSED"
+                time_in = ""
+                if status == "ATTENDED":
+                    matches = [r['time_in'] for r in attended_records if r['date'] == curr]
+                    time_in = str(matches[0]) if matches else "N/A"
+                
+                writer.writerow([curr.strftime("%Y-%m-%d"), status, time_in])
+                curr += timedelta(days=1)
+        
+        cursor.close()
+        conn.close()
+        return filepath
+    except Exception as e:
+        print(f"Export Error: {e}")
+        return False
+
+
+# ------------------------------------------------------------------
+# export_student_monthly_attendance_to_csv(reg_no, course, student_name)
+# PURPOSE : Generate a CSV report of the student's attendance history
+#           specifically for the CURRENT MONTH.
+# ------------------------------------------------------------------
+def export_student_monthly_attendance_to_csv(reg_no, course, student_name):
+    try:
+        import csv
+        import os
+        from datetime import datetime, timedelta
+        
+        # 1. Determine Month Range
+        today = datetime.now().date()
+        month_start = today.replace(day=1)
+        # Next month's first day minus one day is our end
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        month_end = next_month - timedelta(days=1)
+        if month_end > today: month_end = today
+        
+        # 2. Fetch attended records
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT date, time_in FROM attendance WHERE reg_no=%s AND date >= %s AND date <= %s ORDER BY date ASC", (reg_no, month_start, month_end))
+        attended_records = cursor.fetchall()
+        attended_dates = {r['date'] for r in attended_records}
+        
+        # 3. Create file in Downloads
+        home = os.path.expanduser("~")
+        filename = f"Monthly_Attendance_{reg_no}_{datetime.now().strftime('%Y%m')}.csv"
+        filepath = os.path.join(home, "Downloads", filename)
+        
+        with open(filepath, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["MONTHLY ATTENDANCE REPORT", student_name, reg_no])
+            writer.writerow(["Course", course])
+            writer.writerow(["Month", today.strftime("%B %Y")])
+            writer.writerow(["Generated On", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+            writer.writerow([])
+            writer.writerow(["DATE", "STATUS", "TIME IN"])
+            
+            # Loop through all days of the month up to today
+            curr = month_start
+            while curr <= month_end:
+                status = "ATTENDED" if curr in attended_dates else "MISSED"
+                time_in = ""
+                if status == "ATTENDED":
+                    matches = [r['time_in'] for r in attended_records if r['date'] == curr]
+                    time_in = str(matches[0]) if matches else "N/A"
+                
+                writer.writerow([curr.strftime("%Y-%m-%d"), status, time_in])
+                curr += timedelta(days=1)
+        
+        cursor.close()
+        conn.close()
+        return filepath
+    except Exception as e:
+        print(f"Monthly Export Error: {e}")
+        return False
+
+
+# ------------------------------------------------------------------
+# export_student_weekly_attendance_to_csv(reg_no, course, student_name)
+# PURPOSE : Generate a CSV report of the student's attendance history
+#           specifically for the CURRENT WEEK (Mon to Today).
+# ------------------------------------------------------------------
+def export_student_weekly_attendance_to_csv(reg_no, course, student_name):
+    try:
+        import csv
+        import os
+        from datetime import datetime, timedelta
+        
+        # 1. Determine Week Range (Monday to Today)
+        today = datetime.now().date()
+        week_start = today - timedelta(days=today.weekday())
+        
+        # 2. Fetch attended records
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT date, time_in FROM attendance WHERE reg_no=%s AND date >= %s AND date <= %s ORDER BY date ASC", (reg_no, week_start, today))
+        attended_records = cursor.fetchall()
+        attended_dates = {r['date'] for r in attended_records}
+        
+        # 3. Create file in Downloads
+        home = os.path.expanduser("~")
+        filename = f"Weekly_Attendance_{reg_no}_{datetime.now().strftime('%Yw%W')}.csv"
+        filepath = os.path.join(home, "Downloads", filename)
+        
+        with open(filepath, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["WEEKLY ATTENDANCE REPORT", student_name, reg_no])
+            writer.writerow(["Course", course])
+            writer.writerow(["Period", f"{week_start} to {today}"])
+            writer.writerow(["Generated On", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+            writer.writerow([])
+            writer.writerow(["DATE", "STATUS", "TIME IN"])
+            
+            # Loop through all days of the week up to today
+            curr = week_start
+            while curr <= today:
+                status = "ATTENDED" if curr in attended_dates else "MISSED"
+                time_in = ""
+                if status == "ATTENDED":
+                    matches = [r['time_in'] for r in attended_records if r['date'] == curr]
+                    time_in = str(matches[0]) if matches else "N/A"
+                
+                writer.writerow([curr.strftime("%Y-%m-%d"), status, time_in])
+                curr += timedelta(days=1)
+        
+        cursor.close()
+        conn.close()
+        return filepath
+    except Exception as e:
+        print(f"Weekly Export Error: {e}")
+        return False

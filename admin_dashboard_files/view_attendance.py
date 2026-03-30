@@ -240,13 +240,13 @@ def show_all_students_list_content(content_area, responsive_manager, data=None):
             stats_grid = ctk.CTkFrame(main_frame, fg_color="transparent")
             stats_grid.pack(fill="x", padx=40, pady=(0, 20))
             
-            # 3 columns layout
-            for c in range(3):
+            # 4 columns layout
+            for c in range(4):
                 stats_grid.grid_columnconfigure(c, weight=1)
                 
             items = list(stats.items())
             for i, (key, val) in enumerate(items):
-                r, c = i // 3, i % 3
+                r, c = i // 4, i % 4
                 card = ctk.CTkFrame(stats_grid, fg_color="#2c2c2c", corner_radius=10, height=85)
                 card.grid(row=r, column=c, padx=8, pady=8, sticky="nsew")
                 card.pack_propagate(False)

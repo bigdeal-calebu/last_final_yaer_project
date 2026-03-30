@@ -40,10 +40,22 @@ def show_home_content(content_area, responsive_manager, admin_data=None, show_co
     from db import get_daily_system_stats
     total_students, current_present, current_absent = get_daily_system_stats()
 
+    # Calculate Recognition Days
+    from admin_dashboard_files import config_manager
+    from datetime import datetime
+    start_date_str = config_manager.get("starting_date")
+    recognition_days = "0"
+    if start_date_str:
+        try:
+            s_dt = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            recognition_days = str((datetime.now().date() - s_dt).days + 1)
+        except: pass
+
     stats_data = [
         ("Total Students", str(total_students), "#3b9dd8", "👥"),
         ("Today's Present", str(current_present), "#00c853", "✓"),
-        ("Today's Absent", str(current_absent), "#9c27b0", "✗")
+        ("Today's Absent", str(current_absent), "#9c27b0", "✗"),
+        ("TOTAL DAYS FROM START", recognition_days, "#3498db", "🗓️")
     ]
     
     card_h = responsive_manager.pad(100, 110, 120, 130)
@@ -101,7 +113,7 @@ def show_home_content(content_area, responsive_manager, admin_data=None, show_co
     # Start polling
     content_area.after(2000, poll_database_updates)
     
-    responsive_manager.register_grid(stats_frame, 3)
+    responsive_manager.register_grid(stats_frame, 4)
 
     # Action Buttons
     btn_pad = responsive_manager.pad(10, 15, 20, 30)

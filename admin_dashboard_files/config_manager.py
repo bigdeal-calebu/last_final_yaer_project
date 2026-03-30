@@ -25,7 +25,10 @@ DEFAULT_CONFIG = {
     "starting_date": "",
     
     # Deleted Archives Blacklist
-    "deleted_archives_list": []
+    "deleted_archives_list": [],
+    
+    # Target Goal
+    "attendance_goal": 80
 }
 
 _current_config = None
@@ -51,11 +54,12 @@ def load_config():
     _current_config = config_data
     return _current_config
 
-def get(key):
-    """Retrieve a single config value."""
+def get(key, default=None):
+    """Retrieve a single config value with an optional default."""
     if _current_config is None:
         load_config()
-    return _current_config.get(key, DEFAULT_CONFIG.get(key))
+    # Returns from current config, or the provided default, or the system default
+    return _current_config.get(key, default if default is not None else DEFAULT_CONFIG.get(key))
 
 def set_val(key, value):
     """Set a single config value in memory."""

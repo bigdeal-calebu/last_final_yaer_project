@@ -54,23 +54,38 @@ def show_facial_login_ui(parent_frame, on_user_success, on_admin_success, on_bac
 
     reload_classifier()
 
-    # Container
+    # Container - Reduced padding for tiny screens
     card = ctk.CTkFrame(parent_frame, fg_color="#1a1c1e", corner_radius=30, border_width=2, border_color="#333")
-    card.pack(expand=True, padx=20, pady=20, fill="both")
+    card.pack(expand=True, padx=(5 if parent_frame.winfo_width() < 400 else 20), 
+              pady=(5 if parent_frame.winfo_width() < 400 else 20), fill="both")
     
+    # Top Bar (Back button and title)
+    top_bar = ctk.CTkFrame(card, fg_color="transparent")
+    top_bar.pack(fill="x", padx=10, pady=10)
+
     # Back button
-    ctk.CTkButton(card, text="← Manual Login", width=120, height=32, command=on_back_to_manual, 
-                  fg_color="#333", text_color="orange", font=("Arial", 12, "bold")).place(x=20, y=20)
+    back_btn = ctk.CTkButton(top_bar, text="← Back", width=80, height=30, command=on_back_to_manual, 
+                             fg_color="#333", text_color="orange", font=("Arial", 11, "bold"))
+    back_btn.pack(side="left")
 
     # Title
-    ctk.CTkLabel(card, text="FACIAL SCAN LOGIN", font=("Arial", 28, "bold"), text_color="#2ECC71").pack(pady=(60, 5))
-    ctk.CTkLabel(card, text="Look directly at the camera to sign in", font=("Arial", 13), text_color="gray").pack(pady=(0, 20))
+    title_label = ctk.CTkLabel(card, text="FACIAL SCAN LOGIN", font=("Arial", 28, "bold"), text_color="#2ECC71")
+    title_label.pack(pady=(10, 5))
+    
+    subtitle_label = ctk.CTkLabel(card, text="Look directly at the camera to sign in", font=("Arial", 13), text_color="gray")
+    subtitle_label.pack(pady=(0, 15))
 
-    # Camera selector bar
+    # Camera selector bar - Refactored for easy re-packing
     cam_bar = ctk.CTkFrame(card, fg_color="#1a1c1e", corner_radius=10)
     cam_bar.pack(fill="x", padx=40, pady=(0, 10))
-    ctk.CTkLabel(cam_bar, text="📷 Select Camera:", font=("Arial", 12, "bold"), text_color="gray").pack(side="left", padx=(15, 8))
     
+    cam_label = ctk.CTkLabel(cam_bar, text="📷 Select Camera:", font=("Arial", 12, "bold"), text_color="gray")
+    cam_label.pack(side="left", padx=(15, 8))
+    
+    # Inner sub-frame for button row to allow wrapping/stacking
+    cam_btn_frame = ctk.CTkFrame(cam_bar, fg_color="transparent")
+    cam_btn_frame.pack(side="left", fill="x")
+
     cam_btn_refs = {}
     def select_camera(idx):
         if idx == shared.current_camera_index: return
@@ -78,10 +93,12 @@ def show_facial_login_ui(parent_frame, on_user_success, on_admin_success, on_bac
         for i, b in cam_btn_refs.items():
             b.configure(fg_color="#3b9dd8" if i == idx else "#333")
 
-    for cam_idx in [0, 1]:
-        is_avail = cam_idx in shared.available_camera_indices
-        btn_text = "Primary" if cam_idx == 0 else "Secondary"
-        b = ctk.CTkButton(cam_bar, text=btn_text, width=90, height=28, 
+    # Loop through all detected cameras
+    for cam_idx in shared.available_camera_indices:
+        btn_text = "Primary" if cam_idx == 0 else f"Camera {cam_idx}"
+        if cam_idx == 1: btn_text = "Secondary"
+        
+        b = ctk.CTkButton(cam_btn_frame, text=btn_text, width=90, height=28, 
                           fg_color="#3b9dd8" if cam_idx == shared.current_camera_index else "#333",
                           font=("Arial", 11, "bold"), command=lambda i=cam_idx: select_camera(i))
         b.pack(side="left", padx=4)
@@ -107,9 +124,8 @@ def show_facial_login_ui(parent_frame, on_user_success, on_admin_success, on_bac
         on_close()
         on_back_to_manual()
 
-    # Update back button reference
-    ctk.CTkButton(card, text="← Manual Login", width=120, height=32, command=safe_back, 
-                  fg_color="#333", text_color="orange", font=("Arial", 12, "bold")).place(x=20, y=20)
+    # Update back button reference (already done in top_bar above, but let's replace the duplicate)
+    back_btn.configure(command=safe_back)
 
     # Hack to allow parent to stop the loop when switching back
     parent_frame.stop_facial_loop = on_close
@@ -190,7 +206,7 @@ def show_facial_login_ui(parent_frame, on_user_success, on_admin_success, on_bac
                                     best_score = score
                                     best_match = sid
                             
-                            if best_score > 0.36:
+                            if best_score >= 0.78:
                                 recognized_sid = best_match
                                 cv2.putText(frame, f"Match: {best_match}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                             else:
@@ -214,6 +230,55 @@ def show_facial_login_ui(parent_frame, on_user_success, on_admin_success, on_bac
             
         if loop_active[0]:
             viewport.after(33, update_frame)
+
+    # ── RESPONSIVENESS ──────────────────────────────────
+    def on_resize(event=None):
+        if not card.winfo_exists(): return
+        width = parent_frame.winfo_width()
+        
+        # Tiny (< 400px) layout logic
+        if width < 400: 
+            vh = max(200, parent_frame.winfo_height() - 320)
+            fs = 18
+            cpad = 10
+            card_pad = 5
+            
+            # Stack camera bar vertically
+            cam_label.pack_configure(side="top", anchor="center", padx=0, pady=(5, 2))
+            cam_btn_frame.pack_configure(side="top", fill="x", anchor="center")
+            for b in cam_btn_refs.values():
+                b.pack_configure(side="left", expand=True) # Spread buttons in the new stack
+                
+        elif width < 600: # Mobile
+            vh = 300
+            fs = 22
+            cpad = 20
+            card_pad = 15
+            
+            # Reset camera bar to horizontal
+            cam_label.pack_configure(side="left", anchor="center", padx=(15, 8), pady=0)
+            cam_btn_frame.pack_configure(side="left", fill="x")
+            for b in cam_btn_refs.values():
+                b.pack_configure(side="left", expand=False)
+        else: # Tablet/Desktop
+            vh = 400
+            fs = 28
+            cpad = 40
+            card_pad = 20
+            
+            cam_label.pack_configure(side="left", anchor="center", padx=(15, 8), pady=0)
+            cam_btn_frame.pack_configure(side="left", fill="x")
+            for b in cam_btn_refs.values():
+                b.pack_configure(side="left", expand=False)
+            
+        viewport.configure(height=vh)
+        preview_container.pack_configure(padx=cpad)
+        cam_bar.pack_configure(padx=cpad)
+        card.pack_configure(padx=card_pad, pady=card_pad)
+        title_label.configure(font=("Arial", fs, "bold"))
+
+    parent_frame.bind("<Configure>", on_resize)
+    on_resize()
 
     # Start loop
     threading.Thread(target=lambda: shared.start_camera_stream(), daemon=True).start()

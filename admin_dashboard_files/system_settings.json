@@ -14,5 +14,6 @@
         "Present_2026-03-29.xlsx",
         "Absent_2026-03-29.xlsx"
     ],
+    "attendance_goal": 75,
     "last_archive_date": "2026-03-30"
 }

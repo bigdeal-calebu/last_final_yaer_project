@@ -123,8 +123,8 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
         has_sidebar=True   # desktop will show it; small screens won't
     )
 
-    # Hamburger lives in header controls (only visible on tiny via rm)
-    rm.create_hamburger_button(app_header.controls_frame)
+    # Hamburger lives in header menu_holder (consistent with admin)
+    rm.create_hamburger_button(app_header.menu_holder)
 
     # ── Page re-render tracking ───────────────────────────────────────
     _current_renderer = [None]
@@ -209,7 +209,6 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
 
     MENU_ITEMS = [
         ("My Profile",    "👤", lambda: show_profile()),
-        ("Materials",     "📚", lambda: show_page("Course Materials")),
         ("Notifications", "🔔", lambda: show_notifications()),
         ("Edit Details",  "✏️", lambda: show_edit_details()),
         ("Digital ID",    "🪪", lambda: show_digital_id()),
@@ -342,18 +341,19 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
                 rm.hamburger_btn.pack(side="right", padx=8)
 
         else:
-            # ── Mobile / tablet: horizontal ribbon, no sidebar ─────────
+            # ── Mobile / tablet: horizontal ribbon, NO switch to hamburger for consistency ─────────
+            # Actually, user wants the hamburger menu on all small screens!
             rm.has_sidebar = False
             rm._apply_small()
 
-            cols = 3 if mode == "mobile" else 6
-            _build_ribbon(cols)
-
-            ribbon_container.pack(fill="x", pady=(0, 2))
-
-            # Hide hamburger (ribbon replaces it)
+            ribbon_container.pack_forget() # Hide the ribbon
+            
+            # Ensure hamburger is visible
             if rm.hamburger_btn and rm.hamburger_btn.winfo_exists():
-                rm.hamburger_btn.pack_forget()
+                rm.hamburger_btn.pack(side="right", padx=8)
+
+            # Re-render content
+            _rerender()
 
         if page_title_label.winfo_exists():
             show_header(page_title_label.cget("text"))
@@ -487,20 +487,20 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
             student_data.get("registration_no", "N/A"), course
         )
         if stats:
-            att        = str(stats.get("Classes Attended", 0))
-            miss       = str(stats.get("Classes Missed",   0))
-            late       = str(stats.get("Late Count",       0))
-            today_info = stats.get("Today's Attendance Status", ("N/A", "gray"))
-            today_v, today_c = today_info
+            att        = str(stats.get("ATTENDED", 0))
+            miss       = str(stats.get("MISSED",   0))
+            prog       = str(stats.get("PROGRESS", "0%"))
+            total      = str(stats.get("TOTAL DAYS FROM START", 1))
         else:
-            att = miss = late = "0"
-            today_v, today_c = "N/A", "gray"
+            att = miss = "0"
+            prog = "0%"
+            total = "0"
 
         stat_items = [
             ("ATTENDED", att,    "#2ECC71", "✅"),
             ("MISSED",   miss,   "#e74c3c", "❌"),
-            ("LATE",     late,   "#F39C12", "⏰"),
-            ("TODAY",    today_v, today_c,  "📍"),
+            ("PROGRESS", prog,   "#3498db", "📈"),
+            ("TOTAL DAYS FROM START", total, "#9B59B6", "📅"),
         ]
 
         card_h = 105 if small else 120
@@ -534,11 +534,48 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
         act_frame.pack(fill="x", pady=(0, 14), padx=pad_x)
 
         btn_h = 46 if small else 52
+        from db import export_student_attendance_to_csv, export_student_monthly_attendance_to_csv, export_student_weekly_attendance_to_csv
+        from tkinter import messagebox
+
+        def handle_download(mode="whole"):
+            if mode == "weekly":
+                res = export_student_weekly_attendance_to_csv(
+                    student_data["registration_no"], 
+                    course, 
+                    student_data["name"]
+                )
+            elif mode == "monthly":
+                res = export_student_monthly_attendance_to_csv(
+                    student_data["registration_no"], 
+                    course, 
+                    student_data["name"]
+                )
+            else:
+                res = export_student_attendance_to_csv(
+                    student_data["registration_no"], 
+                    course, 
+                    student_data["name"]
+                )
+                
+            if res:
+                messagebox.showinfo("Success", f"Attendance Report downloaded to:\n{res}")
+            else:
+                messagebox.showerror("Error", "Could not generate report.")
+
         for btn_text, color in [
-            ("📥 Download Transcript", "#3498db"),
-            ("📧 Contact Advisor",     "#2ECC71"),
-            ("📝 Course Registration", "#F39C12"),
+            ("📥 Weekly Attendance Details",  "#3498db"),
+            ("📅 Monthly Attendance Details", "#2ECC71"),
+            ("📥 Whole Attendance Details",   "#F39C12"),
         ]:
+            if "Weekly" in btn_text:
+                cb = lambda: handle_download(mode="weekly")
+            elif "Monthly" in btn_text:
+                cb = lambda: handle_download(mode="monthly")
+            elif "Whole" in btn_text:
+                cb = lambda: handle_download(mode="whole")
+            else:
+                cb = None
+
             ctk.CTkButton(
                 act_frame, text=btn_text,
                 fg_color=color, hover_color="#1a1c1e",
@@ -546,7 +583,8 @@ def create_student_dashboard(parent_frame, on_logout_click, student_data=None):
                 font=f("btn", "bold"),
                 corner_radius=10,
                 border_width=1, border_color="#333",
-                cursor="hand2"
+                cursor="hand2",
+                command=cb
             )
 
         rm.register_grid(act_frame, max_cols=3)

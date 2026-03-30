@@ -15,68 +15,74 @@ import os
 #           append extra widgets (e.g. admin avatar) to the right side.
 # ------------------------------------------------------------------
 def create_header(parent, title_text="Smart Attendance System", subtitle_text="Admin Dashboard"):
-    # Main Header Frame with Premium Separator
-    header_frame = ctk.CTkFrame(parent, fg_color="#101214", border_width=1, border_color="#2b2b2b") # Midnight Rich Palette
-    header_frame.pack(fill="x", padx=10, pady=(5, 5)) 
+    # Main Header Frame - Professional Standard
+    header_frame = ctk.CTkFrame(parent, fg_color="#1a1c1e", corner_radius=0)
+    header_frame.pack(fill="x", padx=0, pady=0)
+    header_frame.pack_propagate(True) # Ensure it collapses to content
     
-    # 3-Column Layout: Column 1 (Title) is the only one that expands
-    header_frame.columnconfigure(0, weight=0) # Logo stays fixed size
-    header_frame.columnconfigure(1, weight=1) # Title takes all remaining space
-    header_frame.columnconfigure(2, weight=0) # Controls stays fixed size
+    # 5-Column Layout: Logo | Title | Controls(profile) | Utility(buttons) | Menu
+    for i in range(5): header_frame.columnconfigure(i, weight=0)
+    header_frame.columnconfigure(1, weight=1) # Title (expands)
 
     # --- 1️⃣ LOGO SECTION ---
-    logo_container = ctk.CTkFrame(header_frame, corner_radius=20, fg_color="#1a1c1e") # Subtle contrast for logo
+    logo_container = ctk.CTkFrame(header_frame, corner_radius=20, fg_color="#1a1c1e")
     logo_container.grid(row=0, column=0, sticky="w")
     logo_container.grid_propagate(False)
 
     logo_label = ctk.CTkLabel(logo_container, text="")
-    logo_label.place(relx=0.5, rely=0.5, anchor="center") # Centered perfectly
+    logo_label.place(relx=0.5, rely=0.5, anchor="center")
 
-    tagline_label = ctk.CTkLabel(logo_container, text="", 
-                                 text_color="#F5610C")
+    tagline_label = ctk.CTkLabel(logo_container, text="", text_color="#F5610C")
     tagline_label.place(relx=0.5, rely=0.8, anchor="center")
 
-    # --- 2️⃣ TITLE SECTION (The "Spacer" between logo and button) ---
+    # --- 2️⃣ TITLE SECTION ---
     title_sub_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-    title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10) # Balanced height
+    title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=6, pady=0)
 
     main_title = ctk.CTkLabel(
-        title_sub_frame, 
+        title_sub_frame,
         text=title_text.upper(),
-        font=("Segoe UI Variable Display", 32, "bold"), 
+        font=("Segoe UI Variable Display", 32, "bold"), # Restore BIG baseline
         text_color="darkorange",
-        justify="center" # Ensures text stays centered when it wraps
+        justify="center"
     )
-    main_title.pack(expand=True, fill="both") 
+    main_title.pack(fill="x", anchor="center")
 
     sub_title = ctk.CTkLabel(
-        title_sub_frame, 
+        title_sub_frame,
         text=subtitle_text,
-        font=("Segoe UI Variable Small", 16, "italic"), 
+        font=("Segoe UI Variable Small", 16, "italic"), # Restore BIG baseline
         text_color="#2ECC71",
         justify="center"
     )
-    sub_title.pack(expand=True, pady=(0, 5))
+    sub_title.pack(fill="x", anchor="center", pady=(0, 2))
 
-    # --- 3️⃣ CONTROLS ---
+    # --- 3️⃣ CONTROLS — profile area (admin_dashboard adds avatar here) ---
     controls_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-    controls_frame.grid(row=0, column=2, sticky="e")
+    controls_frame.grid(row=0, column=2, sticky="e", padx=(0, 2), pady=8)
 
-    # --- 4️⃣ MENU HOLDER (DEDICATED FOR HAMBURGER) ---
+    # --- 4️⃣ UTILITY — 🔄 + ☀️ buttons live here, separate from profile ---
+    utility_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+    utility_frame.grid(row=0, column=3, sticky="e", padx=(0, 4), pady=8)
+
+    # --- 5️⃣ MENU HOLDER — dedicated column for ☰ hamburger ---
     menu_holder = ctk.CTkFrame(header_frame, fg_color="transparent")
-    menu_holder.grid(row=0, column=2, sticky="ne", padx=10, pady=10)
+    menu_holder.grid(row=0, column=4, sticky="e", padx=(0, 8), pady=8)
 
+    # --- 6️⃣ BOTTOM NAV BAR (Shared Row for Mobile) ---
+    nav_bar_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+    # Will be packed only on small screens
 
     import modify_live
     refresh_btn = ctk.CTkButton(
-        controls_frame, text="🔄", width=30, height=30, corner_radius=15,
+        utility_frame, text="🔄", width=30, height=30, corner_radius=15,
         fg_color="#3498DB", hover_color="#2980B9", text_color="#000000",
         font=("Arial", 12, "bold"), command=modify_live.trigger_live_refresh
     )
     refresh_btn.pack(side="right", padx=(0, 5))
 
     theme_btn = ctk.CTkButton(
-        controls_frame, text="☀️", width=30, height=30, corner_radius=15,
+        utility_frame, text="☀️", width=30, height=30, corner_radius=15,
         fg_color="#2ECC71", hover_color="#27AE60", text_color="#000000",
         font=("Arial", 12, "bold")
     )
@@ -84,8 +90,6 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
 
     # ------------------------------------------------------------------
     # update_logo_image(size)
-    # PURPOSE : Load logo.png from disk and scale it to the given pixel
-    #           size, then display in the logo_label widget.
     # ------------------------------------------------------------------
     def update_logo_image(size):
         try:
@@ -101,127 +105,106 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
 
     # ------------------------------------------------------------------
     # on_resize(event)
-    # PURPOSE : Respond to window <Configure> events and switch between
-    #           mobile (<600px), tablet (<1000px), and desktop layouts.
-    #           Adjusts font sizes, logo dimensions, and button sizes.
+    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # on_resize(event)
     # ------------------------------------------------------------------
     def on_resize(event):
-        width = event.width
-        
-        if width < 400: # TINY MODE (Smaller Android Phones)
-            # Increased wraplength to keep the phrase whole on one line
-            main_title.configure(font=("Segoe UI Variable Display", 12, "bold"), wraplength=200) 
-            sub_title.configure(font=("Segoe UI Variable Small", 9, "italic"), wraplength=200)
+        # Handle both real events and manual calls with the widget object
+        try:
+            width = event.width
+        except (AttributeError, TypeError):
+            try:
+                width = event.winfo_width()
+            except:
+                return # Fallback
+                
+        if width < 2: return
+ 
+        # 1. CLEAN SLATE: Forget all previous layout positions
+        for child in [logo_container, title_sub_frame, utility_frame, menu_holder, controls_frame, nav_bar_frame]:
+            child.grid_forget()
+            child.pack_forget()
+
+        if width < 600:     # ── MOBILE (Grid Column Stack) ───────────────────
+            # FORCE COLLAPSE: Reset all expansion flags
+            header_frame.configure(height=1)
+            for i in range(10): header_frame.rowconfigure(i, weight=0, minsize=0)
+            for i in range(5): header_frame.columnconfigure(i, weight=1 if i==0 else 0)
+
+            # Row 0: Logo Container (Includes Tagline via place)
+            bp_scale = 1.5 if width >= 400 else 1.2
+            update_logo_image(int(42 * bp_scale))
+            logo_container.configure(width=int(56 * bp_scale), height=int(52 * bp_scale))
+            logo_container.grid(row=0, column=0, columnspan=5, pady=(4, 0))
             
-            # --- Grid Layout Update: Move buttons BELOW title ---
-            header_frame.rowconfigure(0, weight=1)
-            header_frame.rowconfigure(1, weight=1)
-            
-            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=(5, 0))
-            logo_container.configure(fg_color="transparent")
-            title_sub_frame.grid_configure(row=0, column=1, sticky="w", pady=(8, 0), padx=(5, 0))
-            controls_frame.grid_configure(row=1, column=0, columnspan=2, sticky="e", pady=(15, 10), padx=(5, 15))
+            # Tagline (FACE ID inside logo box)
+            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", int(9 * bp_scale), "bold"))
+            tagline_label.place(relx=0.5, rely=0.85, anchor="center")
 
-            menu_holder.grid_configure(row=0, column=1, sticky="ne", pady=8, padx=12)
+            # Row 1: Title (Main + Sub) - NO INTERNAL PADDING OR EXPANSION
+            title_sub_frame.grid(row=1, column=0, columnspan=5, sticky="ew", pady=0)
+            header_frame.rowconfigure(1, weight=0) # Strictly no vertical expansion
+            main_title.configure(font=("Segoe UI Variable Display", int(15 * bp_scale), "bold"), wraplength=width-20)
+            sub_title.configure(font=("Segoe UI Variable Small", int(11 * bp_scale), "italic"), wraplength=width-20)
+            title_sub_frame.grid_propagate(True)
 
+            # Row 2: Unified Navigation (Menu | Utility | Profile)
+            # Center this row. Force it to be as short as possible.
+            header_frame.rowconfigure(2, weight=0)
+            header_frame.columnconfigure(0, weight=1) # Left spacer
+            header_frame.columnconfigure(1, weight=0) # Menu
+            header_frame.columnconfigure(2, weight=0) # Buttons
+            header_frame.columnconfigure(3, weight=0) # Profile
+            header_frame.columnconfigure(4, weight=1) # Right spacer
 
+            menu_holder.grid(row=2, column=1, sticky="w", padx=2, pady=(0, 6))
+            utility_frame.grid(row=2, column=2, padx=2, pady=(0, 6))
+            controls_frame.grid(row=2, column=3, sticky="e", padx=2, pady=(0, 6))
 
-            
-            # Subtitle stays compact
-            sub_title.pack_configure(pady=(0, 2))
-            
-            logo_container.configure(width=58, height=85, corner_radius=29) 
-            tagline_label.configure(text="", font=("Segoe UI Variable", 1)) # Hide tagline
-            update_logo_image(35)
-            
-            # Auto-shrink all buttons
-            for child in controls_frame.winfo_children():
-                if isinstance(child, (ctk.CTkButton, ctk.CTkLabel)):
-                    try:
-                        child.configure(width=24, height=24)
-                        if hasattr(child, "configure") and child.cget("text") == "☰":
-                            child.configure(font=("Segoe UI", 15, "bold"))
-                    except: pass
+            # Snap-to-fit: Ensure frame itself doesn't try to fill extra space
+            header_frame.configure(height=1)
+            header_frame.update_idletasks() 
+            return
 
-        elif width < 600: # MOBILE MODE
-            main_title.configure(font=("Segoe UI Variable Display", 15, "bold"), wraplength=280) 
-            sub_title.configure(font=("Segoe UI Variable Small", 11, "italic"), wraplength=280)
-            
-            # --- Grid Layout Update: Move buttons BELOW title ---
-            header_frame.rowconfigure(0, weight=1)
-            header_frame.rowconfigure(1, weight=1)
-            
-            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=(8, 0))
-            logo_container.configure(fg_color="transparent")
-            title_sub_frame.grid_configure(row=0, column=1, sticky="w", pady=(8, 0), padx=(10, 0))
-            controls_frame.grid_configure(row=1, column=0, columnspan=2, sticky="e", pady=(20, 15), padx=(10, 20))
+        elif width < 1000:  # ── TABLET (Horizontal Grid) ─────────────────────
+            for i in range(5): header_frame.columnconfigure(i, weight=1 if i==1 else 0)
+            for i in range(10): header_frame.rowconfigure(i, weight=0, minsize=0)
 
-            menu_holder.grid_configure(row=0, column=1, sticky="ne", pady=10, padx=15)
-
-
-
-            
-            sub_title.pack_configure(pady=(0, 4))
-
-            logo_container.configure(width=76, height=95, corner_radius=38) 
-            tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 7, "bold")) 
-            for child in controls_frame.winfo_children():
-                if isinstance(child, ctk.CTkButton):
-                    child.configure(width=28, height=28)
-
-        elif width < 1000: # TABLET MODE
-            # Reset grid to standard 1-row layout
-            header_frame.rowconfigure(1, weight=0)
-            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=0)
-            logo_container.configure(fg_color="#1a1c1e")
-            title_sub_frame.grid_configure(row=0, column=1, sticky="nsew", pady=10, padx=10)
-            controls_frame.grid_configure(row=0, column=2, sticky="e", pady=0, padx=0)
-            menu_holder.grid_configure(row=0, column=2, sticky="ne", pady=10, padx=10)
-
-            
-            main_title.configure(font=("Segoe UI Variable Display", 18, "bold"), wraplength=400) 
-            sub_title.configure(font=("Segoe UI Variable Small", 12, "italic"), wraplength=400)
-            
             logo_container.configure(width=100, height=100, corner_radius=50)
-            sub_title.pack_configure(pady=(0, 5))
-
+            logo_container.grid(row=0, column=0, sticky="w", padx=8, pady=8)
             tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 8, "bold"))
+            tagline_label.place(relx=0.5, rely=0.8, anchor="center")
             update_logo_image(65)
-            
-            for child in controls_frame.winfo_children():
-                if isinstance(child, ctk.CTkButton):
-                    child.configure(width=32, height=32)
-            
-        else: # DESKTOP MODE
-            # Reset grid to standard 1-row layout
-            header_frame.rowconfigure(1, weight=0)
-            logo_container.grid_configure(row=0, column=0, rowspan=1, sticky="w", padx=0)
-            title_sub_frame.grid_configure(row=0, column=1, sticky="nsew", pady=10, padx=10)
-            controls_frame.grid_configure(row=0, column=2, sticky="e", pady=0, padx=0)
-            menu_holder.grid_configure(row=0, column=2, sticky="ne", pady=10, padx=10)
 
-            
-            main_title.configure(font=("Segoe UI Variable Display", 24, "bold"), wraplength=900) 
-            sub_title.configure(font=("Segoe UI Variable Small", 16, "italic"), wraplength=900)
-            
+            title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=8)
+            wl = max(200, width - 320)
+            main_title.configure(font=("Segoe UI Variable Display", 18, "bold"), wraplength=wl)
+            sub_title.configure(font=("Segoe UI Variable Small", 12, "italic"), wraplength=wl)
+
+            controls_frame.grid(row=0, column=2, sticky="e", padx=2, pady=8)
+            utility_frame.grid(row=0, column=3, sticky="e", padx=4, pady=8)
+            menu_holder.grid(row=0, column=4, sticky="e", padx=8, pady=8)
+
+        else:               # ── DESKTOP (Horizontal Grid) ────────────────────
+            for i in range(5): header_frame.columnconfigure(i, weight=1 if i==1 else 0)
+            for i in range(10): header_frame.rowconfigure(i, weight=0, minsize=0)
+
             logo_container.configure(width=120, height=120, corner_radius=60)
-            sub_title.pack_configure(pady=(0, 5))
-
+            logo_container.grid(row=0, column=0, sticky="w", padx=8, pady=8)
             tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", 10, "bold"))
+            tagline_label.place(relx=0.5, rely=0.8, anchor="center")
             update_logo_image(80)
-            
-            for child in controls_frame.winfo_children():
-                if isinstance(child, ctk.CTkButton):
-                    child.configure(width=36, height=36)
 
-    header_frame.bind("<Configure>", on_resize)
-    # END on_resize
+            title_sub_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=8)
+            wl = max(300, width - 400)
+            main_title.configure(font=("Segoe UI Variable Display", 24, "bold"), wraplength=wl)
+            sub_title.configure(font=("Segoe UI Variable Small", 16, "italic"), wraplength=wl)
 
-    # ------------------------------------------------------------------
-    # toggle_mode()
-    # PURPOSE : Switch CustomTkinter appearance between Dark and Light
-    #           mode and update the theme button icon accordingly.
-    # ------------------------------------------------------------------
+            controls_frame.grid(row=0, column=2, sticky="e", padx=2, pady=8)
+            utility_frame.grid(row=0, column=3, sticky="e", padx=4, pady=8)
+            menu_holder.grid(row=0, column=4, sticky="e", padx=10, pady=8)
+
     def toggle_mode():
         if ctk.get_appearance_mode() == "Dark":
             ctk.set_appearance_mode("Light")
@@ -229,13 +212,17 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
         else:
             ctk.set_appearance_mode("Dark")
             theme_btn.configure(text="☀️")
-    # END toggle_mode
+
+    header_frame.bind("<Configure>", on_resize)
+    
+    # FORCE INITIAL SNAP: Ensure mobile layout applies immediately on start
+    header_frame.after(10, lambda: on_resize(header_frame)) 
     
     theme_btn.configure(command=toggle_mode)
 
-    # Expose both frames so dashboard.py can use them
     header_frame.controls_frame = controls_frame
-    header_frame.menu_holder = menu_holder
+    header_frame.utility_frame  = utility_frame
+    header_frame.menu_holder    = menu_holder
 
     return header_frame
 

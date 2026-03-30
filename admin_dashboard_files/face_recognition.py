@@ -251,9 +251,9 @@ def get_recognition_frame():
                                     best_score, best_match = score, sid
                             except: continue
                         
-                        if best_score >= 0.70:
+                        if best_score >= 0.78:
                             current_match = best_match
-                            current_conf = int(min(99, 90 + (best_score - 0.70) * 33)) 
+                            current_conf = int(min(99, 90 + (best_score - 0.78) * 40)) 
                         else:
                             current_match = "Unknown"
                             current_conf = int(best_score * 100)
@@ -282,7 +282,15 @@ def get_recognition_frame():
             course = "PLEASE BLINK YOUR EYES"
             box_color = (255, 100, 0) # Cyan/Orange prompt for attention
             bg_color = (0, 0, 0)
-        elif stable_sid != "Unknown":
+        elif stable_sid == "Unknown":
+            # Only show Unknown after we have at least 5 samples to avoid flickering
+            if len(hist) >= 5:
+                name = "Unknown"
+                box_color, bg_color = (0, 0, 255), (0, 0, 180)
+            else:
+                name = f"Scanning... ({len(hist)}/5)"
+                box_color, bg_color = (255, 165, 0), (0, 0, 0)
+        else:
             student_info = get_cached_student(stable_sid)
             if student_info:
                 display_conf = 99 if current_conf >= 98 else current_conf

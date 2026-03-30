@@ -142,7 +142,7 @@ def show_generate_dataset_content(content_area, responsive_manager):
     instruction_label = ctk.CTkLabel(controls_frame, text="Enter ID to begin.", font=("Arial", 12, "italic"), text_color="#3498DB", wraplength=260)
     instruction_label.pack(pady=(0, 10))
 
-    count_label = ctk.CTkLabel(controls_frame, text="0 / 100", font=("Arial", 14))
+    count_label = ctk.CTkLabel(controls_frame, text="0 / 500", font=("Arial", 14))
     count_label.pack(pady=5)
 
     # ---------------- ZIP UPLOAD UI (Inside zip_controls_frame) ----------------
@@ -250,30 +250,20 @@ def show_generate_dataset_content(content_area, responsive_manager):
     is_capturing = False
     is_paused = False
     face_data = []
-    max_faces = 100
+    max_faces = 500
     current_stage = 0
 
     capture_stages = [
-        {"target": 5, "instruction": "Stage 1/20: Neutral face (looking straight)."},
-        {"target": 10, "instruction": "Stage 2/20: Slight natural smile."},
-        {"target": 15, "instruction": "Stage 3/20: Big smile (teeth visible)."},
-        {"target": 20, "instruction": "Stage 4/20: Head turned slightly left (~15°)."},
-        {"target": 25, "instruction": "Stage 5/20: Head turned more left (~30°)."},
-        {"target": 30, "instruction": "Stage 6/20: Head turned slightly right (~15°)."},
-        {"target": 35, "instruction": "Stage 7/20: Head turned more right (~30°)."},
-        {"target": 40, "instruction": "Stage 8/20: Looking slightly up (Chin raised)."},
-        {"target": 45, "instruction": "Stage 9/20: Looking slightly down (Chin lowered)."},
-        {"target": 50, "instruction": "Stage 10/20: Tilt head left (Ear toward shoulder)."},
-        {"target": 55, "instruction": "Stage 11/20: Tilt head right (Ear toward shoulder)."},
-        {"target": 60, "instruction": "Stage 12/20: Eyes slightly closed / blinking."},
-        {"target": 65, "instruction": "Stage 13/20: Serious face (No emotion)."},
-        {"target": 70, "instruction": "Stage 14/20: Normal or Bright lighting."},
-        {"target": 75, "instruction": "Stage 15/20: Low lighting / Dim environment. (Cover camera slightly)"},
-        {"target": 80, "instruction": "Stage 16/20: Light from one side (Side shadow)."},
-        {"target": 85, "instruction": "Stage 17/20: Change your background / move slightly."},
-        {"target": 90, "instruction": "Stage 18/20: OPTIONAL: If you wear glasses, put them on. Else, stay neutral."},
-        {"target": 95, "instruction": "Stage 19/20: OPTIONAL: Take glasses off. Else, stay neutral."},
-        {"target": 100, "instruction": "Stage 20/20: Vary distance (Sit farther back, then move close)."}
+        {"target": 50,  "instruction": "Stage 1/10: Position yourself at a normal distance (Neutral)."},
+        {"target": 100, "instruction": "Stage 2/10: Move FAR from the camera (Full face and shoulders visible)."},
+        {"target": 150, "instruction": "Stage 3/10: Be CLOSE to the camera (Face fills the frame)."},
+        {"target": 200, "instruction": "Stage 4/10: NEAR the camera: Turn your head slowly LEFT and RIGHT."},
+        {"target": 250, "instruction": "Stage 5/10: NEAR the camera: Look slightly UP and DOWN (Chin movement)."},
+        {"target": 300, "instruction": "Stage 6/10: FAR from the camera: Turn your head slowly LEFT and RIGHT."},
+        {"target": 350, "instruction": "Stage 7/10: FAR from the camera: Look slightly UP and DOWN."},
+        {"target": 400, "instruction": "Stage 8/10: Change your EXPRESSIONS (Smile, Blink, be serious)."},
+        {"target": 450, "instruction": "Stage 9/10: Tilt your head LEFT and RIGHT (Ear toward shoulder)."},
+        {"target": 500, "instruction": "Stage 10/10: FINAL PASS: Move naturally at various distances."}
     ]
     
     try:

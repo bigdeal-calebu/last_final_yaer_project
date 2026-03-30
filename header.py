@@ -127,43 +127,69 @@ def create_header(parent, title_text="Smart Attendance System", subtitle_text="A
             child.pack_forget()
 
         if width < 600:     # ── MOBILE (Grid Column Stack) ───────────────────
-            # FORCE COLLAPSE: Reset all expansion flags
-            header_frame.configure(height=1)
+            # BALANCED CENTERED LAYOUT
             for i in range(10): header_frame.rowconfigure(i, weight=0, minsize=0)
-            for i in range(5): header_frame.columnconfigure(i, weight=1 if i==0 else 0)
+            for i in range(5): header_frame.columnconfigure(i, weight=1) # All columns weight 1 for centering
 
-            # Row 0: Logo Container (Includes Tagline via place)
-            bp_scale = 1.5 if width >= 400 else 1.2
+            # Row 0: Logo Container - EXPLICITLY CENTERED
+            bp_scale = 1.6 if width >= 400 else 1.2
             update_logo_image(int(42 * bp_scale))
             logo_container.configure(width=int(56 * bp_scale), height=int(52 * bp_scale))
-            logo_container.grid(row=0, column=0, columnspan=5, pady=(4, 0))
+            # Use columnspan=5 and sticky="n" to center in the middle of the frame
+            logo_container.grid(row=0, column=0, columnspan=5, sticky="n", pady=(10, 0))
             
             # Tagline (FACE ID inside logo box)
             tagline_label.configure(text="FACE ID", font=("Segoe UI Variable", int(9 * bp_scale), "bold"))
             tagline_label.place(relx=0.5, rely=0.85, anchor="center")
 
-            # Row 1: Title (Main + Sub) - NO INTERNAL PADDING OR EXPANSION
-            title_sub_frame.grid(row=1, column=0, columnspan=5, sticky="ew", pady=0)
-            header_frame.rowconfigure(1, weight=0) # Strictly no vertical expansion
-            main_title.configure(font=("Segoe UI Variable Display", int(15 * bp_scale), "bold"), wraplength=width-20)
-            sub_title.configure(font=("Segoe UI Variable Small", int(11 * bp_scale), "italic"), wraplength=width-20)
+            # Row 1: Title (Main + Sub) - CENTERED & WRAPPED
+            title_sub_frame.grid(row=1, column=0, columnspan=5, sticky="nsew", pady=(5, 5))
+            
+            # Use slightly smaller base font (13) and tighter wrapping (width-40)
+            main_title.configure(font=("Segoe UI Variable Display", int(13 * bp_scale), "bold"), 
+                                 wraplength=width - 40, justify="center")
+            sub_title.configure(font=("Segoe UI Variable Small", int(10 * bp_scale), "italic"), 
+                                wraplength=width - 40, justify="center")
             title_sub_frame.grid_propagate(True)
 
-            # Row 2: Unified Navigation (Menu | Utility | Profile)
-            # Center this row. Force it to be as short as possible.
+            # Row 2: Unified Navigation (Menu | Utility | Profile) - CENTERED HUB
             header_frame.rowconfigure(2, weight=0)
-            header_frame.columnconfigure(0, weight=1) # Left spacer
-            header_frame.columnconfigure(1, weight=0) # Menu
-            header_frame.columnconfigure(2, weight=0) # Buttons
-            header_frame.columnconfigure(3, weight=0) # Profile
-            header_frame.columnconfigure(4, weight=1) # Right spacer
 
-            menu_holder.grid(row=2, column=1, sticky="w", padx=2, pady=(0, 6))
-            utility_frame.grid(row=2, column=2, padx=2, pady=(0, 6))
-            controls_frame.grid(row=2, column=3, sticky="e", padx=2, pady=(0, 6))
+            # Clear layout and reposition all navigation controls in a centered row
+            menu_holder.grid_forget()
+            utility_frame.grid_forget()
+            
+            # Row 2: Unified Navigation (Menu | Utility | Profile) - CENTERED HUB
+            header_frame.rowconfigure(2, weight=0)
+            
+            # Use columns 1, 2, 3 for centering the buttons
+            # We already have columnconfigure(i, weight=1) for all columns
+            
+            # Menu (Left)
+            menu_holder.grid(row=2, column=1, sticky="e", padx=5, pady=(5, 15))
+            # Theme (Center)
+            utility_frame.grid(row=2, column=2, sticky="n", padx=5, pady=(5, 15))
+            # Profile (Right) - actually refresh_btn is in utility_frame
+            # Let's adjust utility_frame to be the container for Green/Blue and Menu be separate
+            
+            # Clear utility frame internal packing and use grid instead
+            refresh_btn.pack_forget()
+            theme_btn.pack_forget()
+            
+            # Pack buttons inside utility_frame side-by-side
+            theme_btn.pack(side="left", padx=5)
+            refresh_btn.pack(side="left", padx=5)
+            
+            refresh_btn.configure(width=40, height=40, corner_radius=20)
+            theme_btn.configure(width=40, height=40, corner_radius=20)
+            
+            # Ensure the hamburger button (if it exists) fits the circular style
+            for child in menu_holder.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(width=40, height=40, corner_radius=20, font=("Segoe UI", 20, "bold"))
 
-            # Snap-to-fit: Ensure frame itself doesn't try to fill extra space
-            header_frame.configure(height=1)
+            controls_frame.grid_forget()
+
             header_frame.update_idletasks() 
             return
 
